@@ -551,6 +551,28 @@ namespace Oxide.Plugins
             }
             return null;
         }
+
+        void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
+        {
+            BaseEventPlayer eventPlayer = GetUser(player);
+            if(eventPlayer != null)
+            {
+                BaseEventGame room = GetRoomofPlayer(player);
+                if (room != null)
+                    room.OnWeaponFired(projectile,player);
+            } 
+        }
+
+        private void OnMeleeThrown(BasePlayer player, Item item)
+        {
+            BaseEventPlayer eventPlayer = GetUser(player);
+            if(eventPlayer != null)
+            {
+                BaseEventGame room = GetRoomofPlayer(player);
+                if (room != null)
+                    room.OnMeleeThrown(player,item);
+            } 
+        }
         #endregion
 
         #region Event Construction
@@ -1544,6 +1566,15 @@ namespace Oxide.Plugins
             internal virtual object OnWoundCheck(BasePlayer player)
             {
                 return null;
+            }
+
+            internal virtual void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
+            {
+            }
+
+            internal virtual void OnMeleeThrown(BasePlayer player, Item item)
+            {
+                
             }
             
             /// <summary>

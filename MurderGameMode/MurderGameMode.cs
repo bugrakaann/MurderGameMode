@@ -611,6 +611,28 @@ namespace Oxide.Plugins
                 return false;
             }
 
+            internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
+            {
+                var heldEntity = projectile.GetItem();
+                heldEntity.condition = heldEntity.info.condition.max;
+
+                if (projectile.primaryMagazine.contents > 0)
+                {
+                    return;
+                }
+
+                projectile.primaryMagazine.contents = projectile.primaryMagazine.capacity;
+                projectile.SendNetworkUpdateImmediate();
+            }
+
+            internal override void OnMeleeThrown(BasePlayer player, Item item)
+            {
+                var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
+                newMelee._condition = item._condition;
+
+                player.GiveItem(newMelee, BaseEntity.GiveItemReason.PickedUp);
+            }
+
             internal override void PrePlayerDeath(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
             {
                 if(CanDropBody())
