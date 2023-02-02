@@ -2552,13 +2552,11 @@ namespace Oxide.Plugins
             #region Networking
             internal void RemoveFromNetwork()
             {
-                if (Net.sv.write.Start())
-                {
-                    Net.sv.write.PacketID(Network.Message.Type.EntityDestroy);
-                    Net.sv.write.EntityID(Player.net.ID);
-                    Net.sv.write.UInt8((byte)BaseNetworkable.DestroyMode.None);
-                    Net.sv.write.Send(new SendInfo(Player.net.group.subscribers.Where(x => x.userid != Player.userID).ToList()));
-                }
+                var write = Net.sv.StartWrite();
+                write.PacketID(Network.Message.Type.EntityDestroy);
+                write.EntityID(Player.net.ID);
+                write.UInt8((byte)BaseNetworkable.DestroyMode.None);
+                write.Send(new SendInfo(Player.net.group.subscribers.Where(x => x.userid != Player.userID).ToList()));
             }
 
             internal void AddToNetwork() => Player.SendFullSnapshot();            
