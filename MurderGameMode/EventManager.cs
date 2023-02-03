@@ -3574,9 +3574,10 @@ namespace Oxide.Plugins
                 {
                     player.ChatMessage($"Selected Arena: {StaticObjectCreator[player.userID]} \nAvailable commands: " +
                                        $"\n/staticobject create <Prefab full name> =>Create prefab with specific shortname" +
-                                       $"\n/staticobject save => Add created object to arena config");
+                                       $"\n/staticobject save => Add created object to arena config" +
+                                       $"\n/staticobject substitute <newprefabName> => substitute looked prefab with new prefab with same location");
                 }
-                player.ChatMessage("/staticobject addzoneentities <zoneID> Saves all zone entities of relevant eventConfig for spawning staticobjects per room");
+                player.ChatMessage("/staticobject addzoneentities <arenaName> Saves all zone entities of relevant eventConfig for spawning staticobjects per room");
                 return;
             }
             else if(args.Length >= 1)
@@ -3696,6 +3697,22 @@ namespace Oxide.Plugins
                         {
                             player.ChatMessage("This entity is not specified in the arena you are editing.");
                             return;
+                        }
+                        break;
+                    case "substitute":
+                        if (AdminEditStaticsRoom.IsAdminAlreadyEditingRoom(player))
+                        {
+                            AdminEditStaticsRoom admineditRoom = AdminEditStaticsRoom.GetEditRoomofPlayer(player);
+                            RaycastHit hit2;
+                            Physics.Raycast(player.eyes.HeadRay(), out hit2);
+                            BaseEntity substitutedentity = hit2.GetEntity();
+                            Vector3 pos = substitutedentity.ServerPosition;
+                            Quaternion rot = substitutedentity.ServerRotation;
+                            var ent = GameManager.server.CreateEntity(args[1], pos, rot);
+                            ent.Spawn();
+                            admineditRoom.RemoveEntity(substitutedentity);
+                            admineditRoom.AddStaticEntityToRoom(ent);
+                            player.ChatMessage(substitutedentity.ShortPrefabName + " is substituted with " + ent.ShortPrefabName + " successfully.");
                         }
                         break;
                     default:
