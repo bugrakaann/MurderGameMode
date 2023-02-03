@@ -405,7 +405,9 @@ namespace Oxide.Plugins
                     // Giving suits to player
                     MurderSkinManager.SkinPreferences preference = MurderSkinManager.GetPreferencesOfPlayer(player.Player);
                     EventManager.GiveKit(player.Player, preference.costume);
+                    SupplyPistolBullet(player.Player,true);
                     InvokeHandler.InvokeRepeating(this, SpawnRandomItems,0f,Configuration.itemspawndelay);
+                    player.Player.SendChildrenNetworkUpdate();
                 });
             }
             
@@ -611,26 +613,17 @@ namespace Oxide.Plugins
                 return false;
             }
 
-            internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
-            {
-                var heldEntity = projectile.GetItem();
-                heldEntity.condition = heldEntity.info.condition.max;
-
-                if (projectile.primaryMagazine.contents > 0)
-                {
-                    return;
-                }
-
-                projectile.primaryMagazine.contents = projectile.primaryMagazine.capacity;
-                projectile.SendNetworkUpdateImmediate();
-            }
-
             internal override void OnMeleeThrown(BasePlayer player, Item item)
             {
                 var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
                 newMelee._condition = item._condition;
 
                 player.GiveItem(newMelee, BaseEntity.GiveItemReason.PickedUp);
+            }
+
+            internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
+            {
+                SupplyPistolBullet(player,false);
             }
 
             internal override void PrePlayerDeath(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
@@ -862,6 +855,36 @@ namespace Oxide.Plugins
                 item.RemoveFromWorld();
                 item.Drop(player.eyes.position, player.eyes.HeadRay().direction * multiplier, new Quaternion());
             }
+
+            private void SupplyPistolBullet(BasePlayer player,bool init)
+            {
+                if (init)
+                {
+                    if (player.inventory.containerMain.GetSlot(24) != null)
+                    {
+                        Item item1 = player.inventory.containerMain.GetSlot(24);
+                        item1.RemoveFromContainer();
+                        item1.Remove();
+                    }
+                    player.inventory.containerMain.capacity = 25;
+                    var item = ItemManager.CreateByItemID(785728077);
+                
+                    if (!item.MoveToContainer(player.inventory.containerMain, 24, true))
+                    {
+                        item.Remove();
+                    }
+                }
+                else
+                {
+                    var item = ItemManager.CreateByItemID(785728077);
+                
+                    if (!item.MoveToContainer(player.inventory.containerMain, 24, true))
+                    {
+                        item.Remove();
+                    }
+                }
+            }
+
             MurderPlayer GetMurderer()
             {
                 foreach(MurderPlayer eventPlayer in EventManager.GetEventPlayersOfRoom(this))
