@@ -568,10 +568,19 @@ namespace Oxide.Plugins
             BaseEventPlayer eventPlayer = GetUser(player);
             if(eventPlayer != null)
             {
-                BaseEventGame room = GetRoomofPlayer(player);
-                if (room != null)
-                    room.OnMeleeThrown(player,item);
+                eventPlayer.Event.OnMeleeThrown(player,item);
             } 
+        }
+        void OnLoseCondition(Item item, ref float amount)
+        {
+            BasePlayer player =item.GetOwnerPlayer();
+            if (player == null)
+                return;
+            BaseEventPlayer eventPlayer = GetUser(player);
+            if (eventPlayer != null)
+            {
+                eventPlayer.Event.OnLoseCondition(item,ref amount);
+            }
         }
         #endregion
 
@@ -1577,6 +1586,8 @@ namespace Oxide.Plugins
                 
             }
             
+            internal virtual void OnLoseCondition(Item item, ref float amount){}
+            
             /// <summary>
             /// Kicks all players out of the event
             /// </summary>
@@ -2294,7 +2305,7 @@ namespace Oxide.Plugins
 
             internal bool IsInvincible => Time.time < _invincibilityEndsAt;
 
-            
+
             internal BaseEventPlayer SpectateTarget { get; private set; } = null;
 
 

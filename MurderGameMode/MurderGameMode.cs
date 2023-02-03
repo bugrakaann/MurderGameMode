@@ -396,6 +396,9 @@ namespace Oxide.Plugins
                     {
                         EventManager.ResetPlayer(player);
                     }
+                    if((player as MurderPlayer).playerRole.playerRole == PlayerRole.Murderer)
+                        (player as MurderPlayer).StartFartTimer();
+                    
                     //UI sound effect for each individual player
                     RunEffect(player.Player.ServerPosition, "assets/bundled/prefabs/fx/item_unlock.prefab", player.Player);
                     SendRoleNamePanel(player as MurderPlayer);
@@ -616,7 +619,7 @@ namespace Oxide.Plugins
             internal override void OnMeleeThrown(BasePlayer player, Item item)
             {
                 var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
-                newMelee._condition = item._condition;
+                newMelee._condition = newMelee.maxCondition;
 
                 player.GiveItem(newMelee, BaseEntity.GiveItemReason.PickedUp);
             }
@@ -624,6 +627,11 @@ namespace Oxide.Plugins
             internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
             {
                 SupplyPistolBullet(player,false);
+            }
+
+            internal override void OnLoseCondition(Item item, ref float amount)
+            {
+                amount = 0;
             }
 
             internal override void PrePlayerDeath(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
@@ -683,7 +691,7 @@ namespace Oxide.Plugins
                 if (!string.IsNullOrEmpty(Config.ZoneID))
                     EventManager.Instance.ZoneManager?.Call("AddPlayerToZoneWhitelist", Config.ZoneID, player);
 
-                (eventPlayer as MurderPlayer).EnableDisplayRoleNameBehaviour();
+                (eventPlayer as MurderPlayer).MurderPlayerInit();
             }
             protected override void SendRoleUI(EventManager.BaseEventPlayer eventPlayer)
             {
@@ -931,8 +939,9 @@ namespace Oxide.Plugins
         
         public class MurderPlayer : EventManager.BaseEventPlayer
         {
+            private Timer fartTimer;
             internal MurderRole playerRole;
-            public void EnableDisplayRoleNameBehaviour()
+            public void MurderPlayerInit()
             {
                 Player.gameObject.AddComponent<DisplayRoleNameBehaviour>();
             }
@@ -973,6 +982,12 @@ namespace Oxide.Plugins
                     (Event as MurderGame).DropRevolver(Player, 7);
                 }
 
+                if (attacker.playerRole.playerRole == PlayerRole.Murderer)
+                {
+                    attacker.ResetFartTimer();
+                }
+                
+                //Event handling
                 if((Event as MurderGame).murdererCount == 0 && Event.Status == EventManager.EventStatus.Started)
                 {
                     (Event as MurderGame).winnerside = EventWinner.Bystanders;
@@ -986,7 +1001,6 @@ namespace Oxide.Plugins
 
                 Player.gameObject.AddComponent<EventManager.RoomSpectatingBehaviour>().Enable(Event);
             }
-
             internal override void DropBody(HitInfo hitInfo)
             {
                 BaseCorpse baseCorpse = Player.CreateCorpse();
@@ -1006,6 +1020,23 @@ namespace Oxide.Plugins
                 }
             }
 
+            internal void Fart()
+            {
+                Player.gameObject.AddComponent<FartEffect>();
+                fartTimer = Instance.timer.In(2 * 60, Fart);
+            }
+
+            internal void StartFartTimer()
+            {
+                fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
+            }
+
+            internal void ResetFartTimer()
+            {
+                fartTimer.DestroyToPool();
+                fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
+            }
+            
             internal bool HasRevolver()
             {
                 Item revolver = Player.inventory.containerMain.FindItemsByItemName("pistol.python");
@@ -1142,6 +1173,49 @@ namespace Oxide.Plugins
                 corpseRole = _corpseRole;
             }
         }
+        public class FartEffect : MonoBehaviour
+        {
+            public BasePlayer player;
+            public string effect;
+            public Vector3 effectPosition;
+            public float repeattime;
+            public int toberepeated;
+            public int repeated;
+
+            private void Awake()
+            {
+                player = GetComponent<BasePlayer>();
+                effect = "assets/bundled/prefabs/fx/door/barricade_spawn.prefab";
+                effectPosition = Vector3.zero;
+                repeattime = 1f;
+                toberepeated = 20;
+                RunTimer();
+            }
+
+            public void RunTimer() => InvokeRepeating("RunEffect", 0.2f, repeattime);
+
+            public void DestroyTimer() => CancelInvoke("RunEffect");
+
+            private void RunEffect()
+            {
+                if (string.IsNullOrEmpty(effect) || player == null)
+                    return;
+                if (repeated > toberepeated)
+                {
+                    DestroyImmediate(this);
+                    return;
+                }
+                
+                Effect.server.Run(effect, player, 0, effectPosition, new Vector3(1, 0, 0), null, true);
+                repeated++;
+            }
+
+            private void OnDestroy()
+            {
+                DestroyTimer();
+                Destroy(this); 
+            }
+        }
         
         #endregion
 
@@ -1160,6 +1234,7 @@ namespace Oxide.Plugins
             else
                 return murderPlayer.playerRole.realName;
         }
+        
         #endregion
         
         #region Event Checks
@@ -1223,6 +1298,8 @@ namespace Oxide.Plugins
             
             [JsonProperty("Wounded state time duration")]
             public float woundedDuration { get; set; }
+            [JsonProperty("Murderer start farting after ... minutes")]
+            public float startFarting { get; set; }
         }
 
         protected override void LoadConfig()
@@ -1372,7 +1449,8 @@ namespace Oxide.Plugins
                     1523403414,//cassette short
                     -2107018088 //shovel bass
                 },
-                woundedDuration = 25f
+                woundedDuration = 25f,
+                startFarting = 7f
             };
         }
 
