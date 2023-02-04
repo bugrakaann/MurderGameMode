@@ -1022,7 +1022,8 @@ namespace Oxide.Plugins
 
             internal void Fart()
             {
-                Player.gameObject.AddComponent<FartEffect>();
+                FartEffect effect = Player.gameObject.AddComponent<FartEffect>();
+                effect.InitializeEffect(Convert.ToUInt32(Event.gameroom.roomID));
                 fartTimer = Instance.timer.In(2 * 60, Fart);
             }
 
@@ -1181,6 +1182,7 @@ namespace Oxide.Plugins
             public float repeattime;
             public int toberepeated;
             public int repeated;
+            private uint groupID;
 
             private void Awake()
             {
@@ -1189,14 +1191,19 @@ namespace Oxide.Plugins
                 effectPosition = Vector3.zero;
                 repeattime = 1f;
                 toberepeated = 20;
+            }
+
+            public void InitializeEffect(uint _groupID)
+            {
+                groupID = _groupID;
                 RunTimer();
             }
 
-            public void RunTimer() => InvokeRepeating("RunEffect", 0.2f, repeattime);
+            public void RunTimer() => InvokeRepeating("ApplyEffect", 0.2f, repeattime);
 
-            public void DestroyTimer() => CancelInvoke("RunEffect");
+            public void DestroyTimer() => CancelInvoke("ApplyEffect");
 
-            private void RunEffect()
+            private void ApplyEffect()
             {
                 if (string.IsNullOrEmpty(effect) || player == null)
                     return;
@@ -1206,7 +1213,7 @@ namespace Oxide.Plugins
                     return;
                 }
                 
-                Effect.server.Run(effect, player, 0, effectPosition, new Vector3(1, 0, 0), null, true);
+                RunEffect(player.ServerPosition, effect, groupID);
                 repeated++;
             }
 
@@ -1450,7 +1457,7 @@ namespace Oxide.Plugins
                     -2107018088 //shovel bass
                 },
                 woundedDuration = 25f,
-                startFarting = 7f
+                startFarting = 5f
             };
         }
 
