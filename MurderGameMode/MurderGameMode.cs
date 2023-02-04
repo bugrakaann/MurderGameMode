@@ -408,7 +408,6 @@ namespace Oxide.Plugins
                     // Giving suits to player
                     MurderSkinManager.SkinPreferences preference = MurderSkinManager.GetPreferencesOfPlayer(player.Player);
                     EventManager.GiveKit(player.Player, preference.costume);
-                    SupplyPistolBullet(player.Player,true);
                     InvokeHandler.InvokeRepeating(this, SpawnRandomItems,0f,Configuration.itemspawndelay);
                     player.Player.SendChildrenNetworkUpdate();
                 });
@@ -618,15 +617,20 @@ namespace Oxide.Plugins
 
             internal override void OnMeleeThrown(BasePlayer player, Item item)
             {
-                var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
-                newMelee._condition = newMelee.maxCondition;
+                Instance.timer.Once(20f, () =>
+                {
+                    var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
+                    (newMelee.GetHeldEntity() as BaseMelee).holsterInfo.displayWhenHolstered = false;
+                    newMelee._condition = newMelee.maxCondition;
 
-                player.GiveItem(newMelee, BaseEntity.GiveItemReason.PickedUp);
+                    player.GiveItem(newMelee, BaseEntity.GiveItemReason.PickedUp);
+                    BroadcastToPlayer(player,"Melee is retrieved");
+                });
             }
 
             internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
             {
-                SupplyPistolBullet(player,false);
+                SupplyPistolBullet(player);
             }
 
             internal override void OnLoseCondition(Item item, ref float amount)
@@ -864,33 +868,18 @@ namespace Oxide.Plugins
                 item.Drop(player.eyes.position, player.eyes.HeadRay().direction * multiplier, new Quaternion());
             }
 
-            private void SupplyPistolBullet(BasePlayer player,bool init)
+            private void SupplyPistolBullet(BasePlayer player)
             {
-                if (init)
-                {
-                    if (player.inventory.containerMain.GetSlot(24) != null)
-                    {
-                        Item item1 = player.inventory.containerMain.GetSlot(24);
-                        item1.RemoveFromContainer();
-                        item1.Remove();
-                    }
-                    player.inventory.containerMain.capacity = 25;
-                    var item = ItemManager.CreateByItemID(785728077);
+                var item = ItemManager.CreateByItemID(785728077);
                 
+                Instance.timer.Once(20f, () =>
+                {
                     if (!item.MoveToContainer(player.inventory.containerMain, 24, true))
                     {
                         item.Remove();
                     }
-                }
-                else
-                {
-                    var item = ItemManager.CreateByItemID(785728077);
-                
-                    if (!item.MoveToContainer(player.inventory.containerMain, 24, true))
-                    {
-                        item.Remove();
-                    }
-                }
+                    BroadcastToPlayer(player,"Ammo loaded");
+                });
             }
 
             MurderPlayer GetMurderer()
@@ -1136,7 +1125,7 @@ namespace Oxide.Plugins
                 CuiHelper.DestroyUi(murderPlayer.Player, namelabel_UI);
                 CuiElementContainer container =
                     UI.Container(namelabel_UI, "0 0 0 0", UI.TransformToUI4(853f, 1077f, 449f, 525f));
-                UI.Label(container,namelabel_UI,opponent.playerRole.roleName,13,UI.TransformToUI4(0f,224f,22f,46f,224f,76f),TextAnchor.UpperCenter,opponent.playerRole.roleColor);
+                UI.Label(container,namelabel_UI,opponent.playerRole.roleName,13,UI.TransformToUI4(0f,224f,22f,46f,224f,76f),TextAnchor.UpperCenter,UI.Color(opponent.playerRole.roleColor,1f));
                 CuiHelper.AddUi(murderPlayer.Player, container);
                 DestroyLabelDelayed(3f);
             }
