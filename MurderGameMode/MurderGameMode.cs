@@ -344,21 +344,18 @@ namespace Oxide.Plugins
                         SetRole(eventPlayers[i], PlayerRole.Murderer);
                         index.Remove(i);
                         murdererCount++;
-                        Console.WriteLine("Murderer kit given");
                     }
                     else if (sheriffCount < Configuration.sheriffNum)
                     {
                         SetRole(eventPlayers[i], PlayerRole.Sheriff);
                         index.Remove(i);
                         sheriffCount++;
-                        Console.WriteLine("Sheriff kit given");
                     }
                     else
                     {
                         SetRole(eventPlayers[i], PlayerRole.Bystander);
                         index.Remove(i);
                         innocentCount++;
-                        Console.WriteLine("Innocent kit given");
                     }
                 }
                 Pool.FreeList(ref index);
@@ -409,7 +406,7 @@ namespace Oxide.Plugins
                     MurderSkinManager.SkinPreferences preference = MurderSkinManager.GetPreferencesOfPlayer(player.Player);
                     EventManager.GiveKit(player.Player, preference.costume);
                     InvokeHandler.InvokeRepeating(this, SpawnRandomItems,0f,Configuration.itemspawndelay);
-                    player.Player.SendChildrenNetworkUpdate();
+                    player.Player.SendNetworkUpdate();
                 });
             }
             

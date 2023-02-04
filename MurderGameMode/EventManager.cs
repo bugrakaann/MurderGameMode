@@ -3741,6 +3741,11 @@ namespace Oxide.Plugins
                 return;
             if (AdminEditStaticsRoom.IsAdminAlreadyEditingRoom(player))
                 return;
+            if (GetRoomofPlayer(player) != null)
+            {
+                player.ChatMessage("Leave game room and try again.");
+                return;
+            }
             AdminEditStaticsRoom adminRoom = new AdminEditStaticsRoom();
             adminRoom.StartEditing(arg);
         }
