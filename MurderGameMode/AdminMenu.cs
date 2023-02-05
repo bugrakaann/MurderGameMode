@@ -56,6 +56,11 @@ namespace Oxide.Plugins
         {
             Instance = this;
         }
+
+        void OnServerInitialized()
+        {
+            RegisterImages();
+        }
         
         void Loaded()
         {
@@ -63,6 +68,11 @@ namespace Oxide.Plugins
             permission.RegisterPermission(ADMINMENU_PERMISSION,this);
         }
         #endregion
+
+        void RegisterImages()
+        {
+            AddImage("unknownprofilephoto","https://steamcdn-a.akamaihd.net/steamcommunity/public/images/avatars/b5/b5bd56c1aa4644a474a2e4972be27ef9e82e517e_full.jpg");
+        }
 
         private Dictionary<ulong, string[]> lastPage = new Dictionary<ulong, string[]>();
         [ChatCommand("murderadminmenu")]
@@ -233,11 +243,12 @@ namespace Oxide.Plugins
         void CreatePlayerTab(CuiElementContainer container, MenuArgs args,BasePlayer admin,ulong steamID)
         {
             BasePlayer player = BasePlayer.FindByID(steamID);
-            //Profile photo
-            UI.Image(container,spectatemenu_UI,GetImage(player.UserIDString),UI.TransformToUI4(67f,67f + 288f,517f,517f + 288f,1722f,929f));
-
+            
             if (player != null)
             {
+                //Profile photo
+                UI.Image(container,spectatemenu_UI,GetImage(player.UserIDString),UI.TransformToUI4(67f,67f + 288f,517f,517f + 288f,1722f,929f));
+
                 UI.Label(container,spectatemenu_UI,GetPlayerDetailsLeft(player),15,UI.TransformToUI4(436f,1105f,500f,800f,1722f,929f),TextAnchor.UpperLeft);
                 UI.Label(container,spectatemenu_UI,GetPlayerDetailsRight(player),15,UI.TransformToUI4(1030f,1677f,500f,800f,1722f,929f),TextAnchor.UpperLeft);
                 
@@ -271,15 +282,18 @@ namespace Oxide.Plugins
             }
             else
             {
+                UI.Image(container,spectatemenu_UI,GetImage(steamID.ToString()),UI.TransformToUI4(67f,67f + 288f,517f,517f + 288f,1722f,929f));
+                UI.Label(container,spectatemenu_UI,GetPlayerDetailsLeft(steamID),15,UI.TransformToUI4(436f,1105f,500f,800f,1722f,929f),TextAnchor.UpperLeft);
+                
                 int xindex = 0; float xoffset = 307f / 1920f;
                 int yindex = 0; float yoffset = 67f / 1080f;
                 UI4 ui4 = UI.TransformToUI4(55f, 355f, 404f, 458f, 1722f, 929f);
-                if(!IsPlayerBanned(player.userID))
+                if(!IsPlayerBanned(steamID))
                     UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Ban", 12,
-                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.BanMenu} {player.UserIDString}");
+                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.BanMenu} {steamID}");
                 else
                     UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Unban", 12,
-                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.action {(int)Action.Unban} {player.UserIDString}");
+                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.action {(int)Action.Unban} {steamID}");
                 
             }
             CreatePlayerSmallMenu(container,args,player);
@@ -380,7 +394,7 @@ namespace Oxide.Plugins
                 if ((args.Page * 75) + i >= allPlayers.Count() || !allPlayers.Any())
                     break;
                 string targetID = allPlayers[i];
-                string name = PlayerDatabase.Call("GetPlayerData,", targetID, "name") as string ?? "Unknown";
+                string name = PlayerDatabase.Call("GetPlayerData", targetID, "name") as string ?? "Unknown";
                 UI.Button(container,spectatemenu_UI,UI.Color("#575757",1f),targetID +":"+name,10,labelpos.SetOffset(55f/1024f,i % 15,360f/1920f,i/15),$"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.None} {targetID}");
             }
         }
@@ -746,6 +760,15 @@ namespace Oxide.Plugins
             return result;
         }
 
+        string GetPlayerDetailsLeft(ulong userID)
+        {
+            string result = string.Empty;
+            result += $"Player IP: {GetUserIP(userID)}\n" +
+                      $"Player name: {GetUserName(userID)}\n" +
+                      $"SteamID: {userID}";
+            return result;
+        }
+
         string GetPlayerDetailsRight(BasePlayer player)
         {
             BanData banData;
@@ -802,6 +825,22 @@ namespace Oxide.Plugins
         string GetUserIP(ulong steamID)
         {
             string result = PlayerDatabase.Call("GetPlayerData", steamID.ToString(), "ip") as string;
+
+            if (string.IsNullOrEmpty(result))
+                return string.Empty;
+            return result;
+        }
+        string GetUserName(ulong steamID)
+        {
+            string result = PlayerDatabase.Call("GetPlayerData", steamID.ToString(), "name") as string;
+
+            if (string.IsNullOrEmpty(result))
+                return string.Empty;
+            return result;
+        }
+        string GetUserID(ulong steamID)
+        {
+            string result = PlayerDatabase.Call("GetPlayerData", steamID.ToString(), "steamid") as string;
 
             if (string.IsNullOrEmpty(result))
                 return string.Empty;
