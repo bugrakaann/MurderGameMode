@@ -45,7 +45,7 @@ namespace Oxide.Plugins
         public enum PlayerTab {None, MuteMenu,BanMenu,ReasonMenu}
         //seconds
         public enum BlockDuration {None,Mns30 =1800,Hr1 = 3600,Hrs3 = 10800,Day1=86400,Week1 =604800,Permanent = 0}
-        public enum Action {None,Unban,Ban,Mute,UnMute,Kick,Teleport,Spectate,StripInventory,CloseRoom}
+        public enum Action {None,Unban,Ban,Mute,UnMute,Kick,Teleport,Spectate,FinishSpectating,StripInventory,CloseRoom}
         public enum Reason {Advertising,Cheating,Griefing,RuleViolation,Racism,Spamming,SusGamePlay,ToxicGamePlay}
 
         #endregion
@@ -168,6 +168,13 @@ namespace Oxide.Plugins
                     ulong userID6 = arg.GetULong(1);
                     UnMutePlayer(userID6,player);
                     break;
+                case Action.Spectate:
+                    ulong userID7 = arg.GetULong(1);
+                    SpectatePlayer(player,userID7);
+                    break;
+                case Action.FinishSpectating:
+                    FinishSpectating(player);
+                    break;
             }
             RefreshAdminMenu(player);
         }
@@ -197,7 +204,7 @@ namespace Oxide.Plugins
             switch (args.Menu)
             {
                 case MenuTab.Player:
-                    CreatePlayerTab(container,args,Convert.ToUInt64(args.playerTabArgs.targetPlayerID));
+                    CreatePlayerTab(container,args,player,Convert.ToUInt64(args.playerTabArgs.targetPlayerID));
                     break;
                 case MenuTab.ActivePlayers:
                     CreateActivePlayersTab(container,args);
@@ -223,7 +230,7 @@ namespace Oxide.Plugins
             UI.Button(container,spectatemenu_UI,UI.Color(args.Menu == MenuTab.Rooms ? configData.highlightedLabelColor: configData.labelColor,1f),"Rooms",14,UI.TransformToUI4(337f + 410f,337f + 189f + 410f,869f,869f + 37f,1722f,929f),$"murderadminmenu.ui {(int)MenuTab.Rooms}");
         }
 
-        void CreatePlayerTab(CuiElementContainer container, MenuArgs args,ulong steamID)
+        void CreatePlayerTab(CuiElementContainer container, MenuArgs args,BasePlayer admin,ulong steamID)
         {
             BasePlayer player = BasePlayer.FindByID(steamID);
             //Profile photo
@@ -239,12 +246,12 @@ namespace Oxide.Plugins
                 UI4 ui4 = UI.TransformToUI4(55f, 355f, 404f, 458f, 1722f, 929f);
                 UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Kick", 12,
                     ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.ReasonMenu} {player.UserIDString} {(int)Action.Kick} 0");
-                    if(!IsPlayerBanned(player.userID))
-                        UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Ban", 12,
-                            ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.BanMenu} {player.UserIDString}");
-                    else
-                        UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Unban", 12,
-                            ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.action {(int)Action.Unban} {player.UserIDString}");
+                if(!IsPlayerBanned(player.userID))
+                    UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Ban", 12,
+                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.ui {(int)MenuTab.Player} {(int)PlayerTab.BanMenu} {player.UserIDString}");
+                else
+                    UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Unban", 12,
+                        ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.action {(int)Action.Unban} {player.UserIDString}");
                     
                 UI.Button(container,spectatemenu_UI, UI.Color(configData.buttonColor, 1f),"Strip Inventory",12,ui4.SetOffset(yoffset,yindex++),$"murderadminmenu.action {(int)Action.StripInventory} {player.UserIDString}");
                 if(!IsPlayerMuted(player.userID))
@@ -253,8 +260,12 @@ namespace Oxide.Plugins
                     UI.Button(container,spectatemenu_UI, UI.Color(configData.buttonColor, 1f),"Unmute",12,ui4.SetOffset(yoffset, yindex++),$"murderadminmenu.action {(int)Action.UnMute} {player.UserIDString}");
                 UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Teleport", 12,
                     ui4.SetOffset(yoffset, yindex++), $"murderadminmenu.action {(int)Action.Teleport} {player.UserIDString}");
-                UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Spectate", 12,
+                if(!IsPlayerSpectating(admin))
+                    UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Spectate", 12,
                     ui4.SetOffset(yoffset, yindex++),$"murderadminmenu.action {(int)Action.Spectate} {player.UserIDString}");
+                    else
+                UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Finish Spectating", 12,
+                    ui4.SetOffset(yoffset, yindex++),$"murderadminmenu.action {(int)Action.FinishSpectating}");
                 UI.Button(container, spectatemenu_UI, UI.Color(configData.buttonColor, 1f), "Room", 12,
                     ui4.SetOffset(yoffset, yindex++,xoffset,xindex),$"murderadminmenu.ui {(int)MenuTab.Room} {player.UserIDString} 0");
             }
@@ -620,7 +631,6 @@ namespace Oxide.Plugins
                 BetterChatMute.Call("API_TimeMute", target.IPlayer, admin.IPlayer,TimeSpan.FromSeconds((int)duration), reason);
             }
         }
-
         void UnMutePlayer(ulong userID, BasePlayer admin)
         {
             BasePlayer target = BasePlayer.FindByID(userID);
@@ -630,6 +640,32 @@ namespace Oxide.Plugins
                 return;
             }
             BetterChatMute.Call("API_Unmute", target.IPlayer, admin.IPlayer);
+        }
+
+        void SpectatePlayer(BasePlayer player,ulong targetID)
+        {
+            BasePlayer target = BasePlayer.FindByID(targetID);
+            if (target == null)
+            {
+                player.ChatMessage("Invalid command. Target is null. Target player may be disconnected");
+                return;
+            }
+            EventManager.SpectatingBehaviour spectatingBehaviour = player.gameObject.AddComponent<EventManager.SpectatingBehaviour>();
+            spectatingBehaviour.Enable(target);
+        }
+
+        void FinishSpectating(BasePlayer player)
+        {
+            EventManager.SpectatingBehaviour behaviour;
+            if (player.TryGetComponent<EventManager.SpectatingBehaviour>(out behaviour))
+            {
+                UnityEngine.Object.DestroyImmediate(behaviour);
+                player.ChatMessage("Spectating ended.");
+            }
+            else
+            {
+                player.ChatMessage("Unexpected command. You are not spectating.");
+            }
         }
 
         bool IsPlayerMuted(ulong userID)
@@ -643,6 +679,12 @@ namespace Oxide.Plugins
 
             bool isMuted = (bool)result;
             return isMuted;
+        }
+        bool IsPlayerSpectating(BasePlayer player)
+        {
+            if (player.HasComponent<EventManager.SpectatingBehaviour>())
+                return true;
+            return false;
         }
 
         #endregion
