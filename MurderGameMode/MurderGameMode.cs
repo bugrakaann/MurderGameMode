@@ -333,7 +333,6 @@ namespace Oxide.Plugins
             }
             void DeclareRoles()
             {
-                System.Random random = new System.Random();
                 List<int> index = Pool.GetList<int>();
                 for (int i = 0; i < eventPlayers.Count; i++) { index.Add(i); }
                 foreach (EventManager.BaseEventPlayer player in eventPlayers)    //Gives sheriff and murderer kits randomly according to config
@@ -1008,6 +1007,11 @@ namespace Oxide.Plugins
 
             internal void Fart()
             {
+                if (Player == null)
+                {
+                    fartTimer.DestroyToPool();
+                    return;
+                }
                 FartEffect effect = Player.gameObject.AddComponent<FartEffect>();
                 effect.InitializeEffect(Convert.ToUInt32(Event.gameroom.roomID));
                 fartTimer = Instance.timer.In(2 * 60, Fart);
