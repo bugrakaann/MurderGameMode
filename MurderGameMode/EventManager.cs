@@ -178,13 +178,13 @@ namespace Oxide.Plugins
             }
 
             // Destroying player
-            if (!player.IsDestroyed || player.IsAlive())
-                NextFrame(() =>
-                {
-                    StripInventory(player);
-                    player.lifestate = BaseCombatEntity.LifeState.Dead;
-                    player.Kill();
-                });
+            // if (!player.IsDestroyed || player.IsAlive())
+            //     NextFrame(() =>
+            //     {
+            //         StripInventory(player);
+            //         player.lifestate = BaseCombatEntity.LifeState.Dead;
+            //         player.Kill();
+            //     });
         }
         void OnEntityKill(BaseEntity entity)
         {
@@ -1027,7 +1027,6 @@ namespace Oxide.Plugins
                 Timer.StopTimer();
 
                 Status = EventManager.EventStatus.Started;
-
                 if (Config.TimeLimit > 0)
                     Timer.StartTimer(Config.TimeLimit, string.Empty, PrestartEvent);
 
@@ -1389,8 +1388,6 @@ namespace Oxide.Plugins
             /// </summary>
             protected virtual void JoinGroupNetwork(BasePlayer player)
             {
-                player.limitNetworking = true;
-
                 uint roomId = Convert.ToUInt32(gameroom.roomID);
                 Network.Visibility.Group group = Net.sv.visibility.Get(roomId);
                 roomobjects.AddRange(player?.children);
@@ -1412,7 +1409,6 @@ namespace Oxide.Plugins
             {
                 if (player == null)
                     return;
-                player.limitNetworking = true;
 
                 Network.Visibility.Group orggroup = Net.sv.visibility.Get(35716);
                 player.children.ForEach(x => roomobjects.Remove(x));
@@ -1696,8 +1692,6 @@ namespace Oxide.Plugins
                 eventPlayer.IsDead = true;
 
                 UpdateDeadSpectateTargets(eventPlayer);
-
-                eventPlayer.Player.limitNetworking = true;
 
                 eventPlayer.Player.DisablePlayerCollider();
 
@@ -2351,8 +2345,6 @@ namespace Oxide.Plugins
                 //if (Player.IsSpectating())
                 //    FinishSpectating();
 
-                //Player.limitNetworking = false;
-
                 Player.EnablePlayerCollider();
 
                 Player.health = Player.MaxHealth();
@@ -2662,7 +2654,7 @@ namespace Oxide.Plugins
             {
                 if (!Player.IsSpectating())
                     return;
-
+                
                 Player.SetParent(null, false, false);
                 Player.SetPlayerFlag(BasePlayer.PlayerFlags.Spectating, false);
                 Player.gameObject.SetLayerRecursive(17);
@@ -2702,21 +2694,26 @@ namespace Oxide.Plugins
         /// </summary>
         public class SpectatingBehaviour : MonoBehaviour
         {
-            public BasePlayer Player { get; set; }
+            private BasePlayer Player { get; set; }
             internal BasePlayer SpectateTarget { get; private set; } = null;
             private int _spectateIndex = 0;
 
-            public void Enable(BasePlayer player)
+            public void Enable(BasePlayer target)
             {
                 Player = GetComponent<BasePlayer>();
-                BeginSpectating(player);
+                NetworkGroupData data = Player.gameObject.AddComponent<NetworkGroupData>();
+                data.Enable(target.net.group.ID);
+                BeginSpectating(target);
             }
             void OnDestroy()
             {
+                NetworkGroupData data;
+                if(Player.TryGetComponent(out data))
+                    DestroyImmediate(data);
                 FinishSpectating();
             }
 
-            public void BeginSpectating(BasePlayer player)
+            private void BeginSpectating(BasePlayer player)
             {
                 if (Player.IsSpectating())
                     return;
@@ -2725,7 +2722,7 @@ namespace Oxide.Plugins
                 Player.ChatMessage(Message("Notification.SpectateCycle", Player.userID));
             }
 
-            public void FinishSpectating()
+            private void FinishSpectating()
             {
                 if (!Player.IsSpectating())
                     return;
@@ -2735,7 +2732,7 @@ namespace Oxide.Plugins
                 Player.gameObject.SetLayerRecursive(17);
             }
 
-            public void SetSpectateTarget(BasePlayer spectatedPlayer)
+            private void SetSpectateTarget(BasePlayer spectatedPlayer)
             {
                 SpectateTarget = spectatedPlayer;
                 Player.ChatMessage($"Spectating: {spectatedPlayer.displayName}");
@@ -3464,8 +3461,6 @@ namespace Oxide.Plugins
                 player.gameObject.SetLayerRecursive(17);
             }
 
-            //player.limitNetworking = false;
-
             player.EnablePlayerCollider();
 
             player.health = player.MaxHealth();
@@ -3478,8 +3473,6 @@ namespace Oxide.Plugins
         {
             if (eventPlayer == null)
                 return;
-
-            //player.limitNetworking = false;
 
             eventPlayer.Player.EnablePlayerCollider();
 
@@ -3803,8 +3796,6 @@ namespace Oxide.Plugins
                 eventConfig = Instance.Events.events[gamemodeName];
                 StaticObjectCreator.Add(player.userID, eventConfig.EventName);
 
-                player.limitNetworking = true;
-                
                 Network.Visibility.Group group = Net.sv.visibility.Get(roomID);
                 player.gameObject.AddComponent<NetworkGroupData>().Enable(roomID);
                 player.net.SwitchGroup(group);
