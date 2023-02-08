@@ -1089,7 +1089,6 @@ namespace Oxide.Plugins
             /// </summary>
             internal virtual void RestartEvent()
             {
-                
                 Timer.StopTimer();
                 Timer.StartTimer(10, string.Empty, PrestartEvent);
                 foreach (BasePlayer player in GetPlayersOfRoom(this))
@@ -1553,6 +1552,10 @@ namespace Oxide.Plugins
             protected virtual void OnPlayerJoined(BasePlayer player) 
             {
                 Instance.LobbyRoomSystem.Call("RefreshLobbyUI");
+                if (Status == EventManager.EventStatus.Prestarting && !player.HasComponent<BaseEventPlayer>())
+                {
+                    CreateEventPlayer(player);
+                }
             }
 
             /// <summary>
@@ -2645,9 +2648,9 @@ namespace Oxide.Plugins
                 if (Player.IsSpectating())
                     return;
 
+                UpdateSpectateTarget();
                 Player.StartSpectating();
                 Player.ChatMessage(Message("Notification.SpectateCycle", Player.userID));
-                UpdateSpectateTarget();
             }
 
             public void FinishSpectating()
