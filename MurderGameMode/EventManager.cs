@@ -992,6 +992,11 @@ namespace Oxide.Plugins
             /// </summary>
             internal virtual void PrestartEvent()
             {
+                foreach (BasePlayer player in GetPlayersOfRoom(this))
+                {
+                    if (player.HasComponent<BaseEventPlayer>())
+                        DestroyImmediate(player.GetComponent<BaseEventPlayer>());
+                }
                 CleanupEntities();
                 if (!HasMinimumRequiredPlayers())
                 {
@@ -1093,12 +1098,7 @@ namespace Oxide.Plugins
                 Timer.StartTimer(10, string.Empty, PrestartEvent);
                 foreach (BasePlayer player in GetPlayersOfRoom(this))
                     ResetPlayer(player);
-                foreach (BasePlayer player in GetPlayersOfRoom(this))
-                {
-                    if (player.HasComponent<BaseEventPlayer>())
-                        DestroyImmediate(player.GetComponent<BaseEventPlayer>());
-                }
-                
+
                 //CleanupEntities();    // Transfered this method to PrestartEvent
             }
             #endregion
