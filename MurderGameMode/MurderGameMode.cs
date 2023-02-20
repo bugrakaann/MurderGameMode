@@ -879,7 +879,7 @@ namespace Oxide.Plugins
                 {
                     if (eventPlayer == null)
                         return;
-                    if (!item.MoveToContainer(eventPlayer.Player.inventory.containerMain, 24, true))
+                    if (!item.MoveToContainer(eventPlayer.Player.inventory.containerMain))
                     {
                         item.Remove();
                     }
