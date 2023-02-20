@@ -141,6 +141,8 @@ namespace Oxide.Plugins
         }
         object OnPlayerRespawn(BasePlayer player)
         {
+            if (player == null)
+                return null;
             if (player.HasComponent<EventManager.BaseEventPlayer>())
                 return null;
             Vector3 position = lobbyspawnPoints.GetRandom();
