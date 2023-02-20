@@ -316,7 +316,7 @@ namespace Oxide.Plugins
             KeyValuePair<string,string> GetRandomRoleColor()
             {
                 System.Random random = new System.Random();
-                KeyValuePair<string,string> kvp = Configuration.roleColors.ElementAt(random.Next(0,Configuration.roleColors.Count-1));
+                KeyValuePair<string,string> kvp = Configuration.roleColors.ElementAt(random.Next(0, Configuration.roleColors.Count - 1));
                 string color = kvp.Value;
                 if (givenRoleColors.Keys.Contains(color))
                 {
@@ -328,8 +328,7 @@ namespace Oxide.Plugins
                 givenRoleNames.TryAdd(color, 0);
                 givenRoleNames[color]++;
                 
-                KeyValuePair<string,string> newkvp = new KeyValuePair<string,string>(kvp.Key, color);
-                return newkvp;
+                return kvp;
             }
             void DeclareRoles()
             {
@@ -855,7 +854,7 @@ namespace Oxide.Plugins
             {
                 string place = GetGamePlace();
                 object randomloc = GetRandomItemSpawn(place);
-                if (randomloc is string) { string msg = (string)randomloc; Console.WriteLine(msg); return; }
+                if (randomloc is string) { string msg = (string)randomloc; Instance.PrintError(msg); return; }
                 if (randomloc == null) { Instance.PrintError("randomloc null"); return; }
                 Vector3 location = (Vector3)randomloc;
                 DroppedItem item = ItemManager.CreateByItemID(Configuration.randomItemIDs.GetRandom()).Drop(location, Vector3.zero).GetComponent<DroppedItem>();
