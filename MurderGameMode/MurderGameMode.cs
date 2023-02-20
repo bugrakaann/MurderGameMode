@@ -613,8 +613,11 @@ namespace Oxide.Plugins
 
             internal override void OnMeleeThrown(BasePlayer player, Item item)
             {
+                EventManager.BaseEventPlayer eventPlayer = EventManager.GetUser(player);
                 Instance.timer.Once(20f, () =>
                 {
+                    if (eventPlayer == null)
+                        return;
                     var newMelee = ItemManager.CreateByItemID(item.info.itemid, item.amount, item.skin);
                     (newMelee.GetHeldEntity() as BaseMelee).holsterInfo.displayWhenHolstered = false;
                     newMelee._condition = newMelee.maxCondition;
@@ -626,7 +629,8 @@ namespace Oxide.Plugins
 
             internal override void OnWeaponFired(BaseProjectile projectile, BasePlayer player)
             {
-                SupplyPistolBullet(player);
+                EventManager.BaseEventPlayer eventPlayer = EventManager.GetUser(player);
+                SupplyPistolBullet(eventPlayer);
             }
 
             internal override void OnLoseCondition(Item item, ref float amount)
@@ -867,17 +871,19 @@ namespace Oxide.Plugins
                 item.Drop(player.eyes.position, player.eyes.HeadRay().direction * multiplier, new Quaternion());
             }
 
-            private void SupplyPistolBullet(BasePlayer player)
+            private void SupplyPistolBullet(EventManager.BaseEventPlayer eventPlayer)
             {
                 var item = ItemManager.CreateByItemID(785728077);
                 
                 Instance.timer.Once(20f, () =>
                 {
-                    if (!item.MoveToContainer(player.inventory.containerMain, 24, true))
+                    if (eventPlayer == null)
+                        return;
+                    if (!item.MoveToContainer(eventPlayer.Player.inventory.containerMain, 24, true))
                     {
                         item.Remove();
                     }
-                    BroadcastToPlayer(player,"Ammo loaded");
+                    BroadcastToPlayer(eventPlayer,"Ammo loaded");
                 });
             }
 
