@@ -2680,12 +2680,23 @@ namespace Oxide.Plugins
 
                 Event.GetSpectateTargets(ref list);
 
-                int newIndex = (int)Mathf.Repeat(_spectateIndex += 1, list.Count - 1);
-
-                if (list[newIndex] != SpectateTarget)
+                if (list.Count > 0)
                 {
-                    _spectateIndex = newIndex;
-                    SetSpectateTarget(list[_spectateIndex]);
+                    int newIndex = (int)Mathf.Repeat(_spectateIndex += 1, list.Count - 1);
+
+                    if (list[newIndex] != SpectateTarget)
+                    {
+                        _spectateIndex = newIndex;
+                        SetSpectateTarget(list[_spectateIndex]);
+                    }
+                }
+                else
+                {
+                    if (list[0] != SpectateTarget)
+                    {
+                        _spectateIndex = 0;
+                        SetSpectateTarget(list[_spectateIndex]);
+                    }
                 }
 
                 Pool.FreeList(ref list);
