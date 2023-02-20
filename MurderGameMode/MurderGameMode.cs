@@ -672,6 +672,9 @@ namespace Oxide.Plugins
                     return;
 
                 spectators.Remove(player);
+                
+                if (player.HasComponent<EventManager.RoomSpectatingBehaviour>())
+                    DestroyImmediate(player.GetComponent<EventManager.RoomSpectatingBehaviour>());
 
                 EventManager.BaseEventPlayer eventPlayer = AddPlayerComponent(player);
 
@@ -716,7 +719,7 @@ namespace Oxide.Plugins
                 else { return; }
 
                 player.AddUI(role_UI, container);
-                Timer.StartTimer(rolepanelduration, "", () => { player.DestroyUI(role_UI); });
+                Instance.timer.In(rolepanelduration, () => { player.DestroyUI(role_UI); });
             }
 
             public override void SetStaticPrefabRelations()
@@ -961,13 +964,13 @@ namespace Oxide.Plugins
                 }
 
                 if (playerRole.playerRole != PlayerRole.Murderer &&
-                    attacker.playerRole.playerRole == PlayerRole.Sheriff)
+                    attacker?.playerRole.playerRole == PlayerRole.Sheriff)
                 {
                     attacker.Player.GoToCrawling(null);
                     (Event as MurderGame).DropRevolver(Player, 7);
                 }
 
-                if (attacker.playerRole.playerRole == PlayerRole.Murderer)
+                if (attacker?.playerRole.playerRole == PlayerRole.Murderer)
                 {
                     attacker.ResetFartTimer();
                 }
@@ -983,6 +986,7 @@ namespace Oxide.Plugins
                     (Event as MurderGame).winnerside = EventWinner.Murderer;
                     Event.RestartEvent();
                 }
+                fartTimer?.Destroy();
 
                 Player.gameObject.AddComponent<EventManager.RoomSpectatingBehaviour>().Enable(Event);
             }
