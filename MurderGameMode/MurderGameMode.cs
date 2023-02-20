@@ -446,6 +446,8 @@ namespace Oxide.Plugins
                 foreach(MurderPlayer eventPlayer in EventManager.GetEventPlayersOfRoom(this))
                 {
                     eventPlayer.Player.displayName = eventPlayer.playerRole.realName;
+                    if(eventPlayer.fartTimer != null)
+                        eventPlayer.ResetFartTimer();
                 }
                 base.RestartEvent();
             }
@@ -933,7 +935,7 @@ namespace Oxide.Plugins
         
         public class MurderPlayer : EventManager.BaseEventPlayer
         {
-            private Timer fartTimer;
+            internal Timer fartTimer;
             internal MurderRole playerRole;
             public void MurderPlayerInit()
             {
