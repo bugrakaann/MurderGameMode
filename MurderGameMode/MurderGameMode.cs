@@ -1123,7 +1123,7 @@ namespace Oxide.Plugins
                 }
                 LootableCorpse droppedcorpse = entity as LootableCorpse;
                 MurderPlayer.MurderRole corpseRole = droppedcorpse?.GetComponent<DroppedEventCorpse>()?.corpseRole;
-                if (droppedcorpse != null && hit.distance < 2)
+                if (droppedcorpse != null && hit.distance < 2 && murderPlayer.playerRole?.playerRole == PlayerRole.Murderer)
                 {
                     SendCorpseName(corpseRole);
                     yield break;
