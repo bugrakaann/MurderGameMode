@@ -1090,6 +1090,7 @@ namespace Oxide.Plugins
                 while (isActive)
                 {
                     yield return StartCoroutine(CheckEntity());
+                    yield return new WaitForSeconds(.2f);
                 }
             }
 
@@ -1102,36 +1103,31 @@ namespace Oxide.Plugins
             }
             IEnumerator CheckEntity()
             {
+                BaseEntity entity;
                 RaycastHit hit;
                 bool isHit = Physics.Raycast(murderPlayer.Player.eyes.HeadRay(), out hit);
                 if (!isHit)
-                {
-                    yield return new WaitForSeconds(.2f);
                     yield break;
-                }
 
-                if (hit.GetEntity() == null)
+                entity = hit.GetEntity();
+                if (entity == null)
                 {
-                    yield return new WaitForSeconds(.2f);
                     yield break;
                 }
-                BasePlayer baseopponent = hit.GetEntity() as BasePlayer;
+                BasePlayer baseopponent = entity as BasePlayer;
                 MurderPlayer opponent = baseopponent?.GetComponent<MurderPlayer>();
-                if (opponent != null && hit.distance < 16)
+                if (opponent != null && hit.distance < 16 && opponent.playerRole != null)
                 {
                     SendName(opponent);
-                    yield return new WaitForSeconds(.2f);
                     yield break;
                 }
-                LootableCorpse droppedcorpse = hit.GetEntity() as LootableCorpse;
+                LootableCorpse droppedcorpse = entity as LootableCorpse;
                 MurderPlayer.MurderRole corpseRole = droppedcorpse?.GetComponent<DroppedEventCorpse>()?.corpseRole;
                 if (droppedcorpse != null && hit.distance < 2)
                 {
                     SendCorpseName(corpseRole);
-                    yield return new WaitForSeconds(.2f);
                     yield break;
                 }
-                yield return new WaitForSeconds(.2f);
             }
             void SendName(MurderPlayer opponent)
             {
