@@ -295,6 +295,7 @@ namespace Oxide.Plugins
             #region Player Role Determination
             Dictionary<string,int> givenRoleNames = new Dictionary<string,int>(); //Created to prevent players same take multiple names
             Dictionary<string,int> givenRoleColors = new Dictionary<string, int>(); //Created to prevent players take multiple same colors
+            System.Random random = new System.Random();
             void SetRole(EventManager.BaseEventPlayer eventPlayer, PlayerRole role)
             {
                 eventPlayer.Kit=role.ToString();
@@ -315,8 +316,8 @@ namespace Oxide.Plugins
             }
             KeyValuePair<string,string> GetRandomRoleColor()
             {
-                System.Random random = new System.Random();
-                KeyValuePair<string,string> kvp = Configuration.roleColors.ElementAt(random.Next(0, Configuration.roleColors.Count - 1));
+                int index = random.Next(0, Configuration.roleColors.Count - 1);
+                KeyValuePair<string,string> kvp = Configuration.roleColors.ElementAt(index);
                 string color = kvp.Value;
                 if (givenRoleColors.Keys.Contains(color))
                 {
@@ -358,7 +359,12 @@ namespace Oxide.Plugins
                 }
                 Pool.FreeList(ref index);
             }
-            void SwitchName(EventManager.BaseEventPlayer player) => player.Player.displayName = (player as MurderPlayer).playerRole.roleName;
+
+            void SwitchName(EventManager.BaseEventPlayer player)
+            {
+                player.Player.displayName = (player as MurderPlayer).playerRole.roleName;
+                // çalışmıyorr
+            }
             #endregion
             #region Overrides
 
@@ -391,9 +397,8 @@ namespace Oxide.Plugins
                     {
                         EventManager.ResetPlayer(player);
                     }
-                    if((player as MurderPlayer).playerRole.playerRole == PlayerRole.Murderer)
-                        (player as MurderPlayer).StartFartTimer();
-                    
+                    (player as MurderPlayer).StartFartTimer();
+
                     //UI sound effect for each individual player
                     RunEffect(player.Player.ServerPosition, "assets/bundled/prefabs/fx/item_unlock.prefab", player.Player);
                     SendRoleNamePanel(player as MurderPlayer);
@@ -497,6 +502,7 @@ namespace Oxide.Plugins
                 base.LeaveEvent(eventPlayer);
             }
             protected override bool CanDropBackpack() { return false;}
+            //Disguising kılık değiştirme
             internal override object CanLootEntity(BasePlayer player, LootableCorpse corpse)
             {
                 MurderPlayer murderPlayer = EventManager.GetUser(player) as MurderPlayer;
@@ -521,15 +527,17 @@ namespace Oxide.Plugins
                 }
                 return null;
             }
-            
-            protected override float GetDamageModifier(EventManager.BaseEventPlayer eventPlayer)
+
+            internal override void OnPlayerTakeDamage(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
             {
-                // Eğer kullanılan silah pythonsa damagei yükselt.
-                if (eventPlayer?.Player?.GetActiveItem()?.info?.shortname == "pistol.python"|| eventPlayer?.Player?.GetActiveItem()?.info?.shortname == "knife.combat") 
-                    return 100;
-                
-                return base.GetDamageModifier(eventPlayer);
+                base.OnPlayerTakeDamage(eventPlayer, hitInfo);
+                if (hitInfo?.Weapon?.ShortPrefabName == "pistol.python" ||
+                    hitInfo.Weapon?.ShortPrefabName == "knife.combat")
+                {
+                    hitInfo.damageTypes.ScaleAll(100);
+                }
             }
+            
             internal override object CanMoveItem(Item item, PlayerInventory playerLoot, uint targetContainer, int targetSlot, int amount)
             {
                 return false;
@@ -578,12 +586,12 @@ namespace Oxide.Plugins
                 {
                     attacker.OnKilledPlayer(info);
 
-                    if (GetAlivePlayerCount() <= 1)
-                    {
-                        winner = attacker;
-                        InvokeHandler.Invoke(this, EndEvent, 0.1f);
-                        return;
-                    }
+                    // if (GetAlivePlayerCount() <= 1)
+                    // {
+                    //     winner = attacker;
+                    //     InvokeHandler.Invoke(this, EndEvent, 0.1f);
+                    //     return;
+                    // }
                 }
 
                 UpdateScoreboard();
@@ -1030,15 +1038,33 @@ namespace Oxide.Plugins
 
             internal void StartFartTimer()
             {
-                fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
+                if (playerRole.playerRole == PlayerRole.Murderer)
+                {
+                    fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
+                }
+                else
+                {
+                    FartEffect fartEffect;
+                    if (Player.TryGetComponent(out fartEffect))
+                    {
+                        DestroyImmediate(fartEffect);
+                    }
+                    fartTimer?.DestroyToPool();
+                    fartTimer = null;
+                }
             }
 
             internal void ResetFartTimer()
             {
+                FartEffect fartEffect;
+                if (Player.TryGetComponent(out fartEffect))
+                {
+                    DestroyImmediate(fartEffect);
+                }
                 fartTimer.DestroyToPool();
                 fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
             }
-            
+
             internal bool HasRevolver()
             {
                 Item revolver = Player.inventory.containerMain.FindItemsByItemName("pistol.python");
@@ -1120,9 +1146,9 @@ namespace Oxide.Plugins
                     SendName(opponent);
                     yield break;
                 }
-                LootableCorpse droppedcorpse = entity as LootableCorpse;
-                MurderPlayer.MurderRole corpseRole = droppedcorpse?.GetComponent<DroppedEventCorpse>()?.corpseRole;
-                if (droppedcorpse != null && hit.distance < 2 && murderPlayer.playerRole?.playerRole == PlayerRole.Murderer)
+                BaseCorpse droppedcorpse = entity as BaseCorpse;
+                MurderPlayer.MurderRole corpseRole = droppedcorpse?.gameObject.GetComponent<DroppedEventCorpse>()?.corpseRole;
+                if (corpseRole != null && hit.distance < 2 && murderPlayer?.playerRole?.playerRole == PlayerRole.Murderer)
                 {
                     SendCorpseName(corpseRole);
                     yield break;
