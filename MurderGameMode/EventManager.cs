@@ -309,7 +309,7 @@ namespace Oxide.Plugins
             if (eventPlayer != null && GetRoomofPlayer(player) != null)
                 return false;
             return null;
-        }
+        }   
 
         private object OnPlayerDeath(BasePlayer player, HitInfo hitInfo)
         {
@@ -1650,7 +1650,6 @@ namespace Oxide.Plugins
 
                 if (GodmodeEnabled || eventPlayer.IsDead || eventPlayer.IsInvincible)
                 {
-                    Console.WriteLine("couldnt take damage");
                     ClearDamage(hitInfo);
                     return;
                 }
@@ -2680,7 +2679,7 @@ namespace Oxide.Plugins
 
                 Event.GetSpectateTargets(ref list);
 
-                if (list.Count > 0)
+                if (list.Count > 1)
                 {
                     int newIndex = (int)Mathf.Repeat(_spectateIndex += 1, list.Count - 1);
 
