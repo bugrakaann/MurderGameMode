@@ -60,8 +60,6 @@ namespace Oxide.Plugins
         public static Dictionary<int, BaseEventGame> BaseManager= new Dictionary<int, BaseEventGame>();
         public static Dictionary<int, AdminEditStaticsRoom> AdminEditingRooms = new Dictionary<int, AdminEditStaticsRoom>();
 
-        private static List<Collider> AllEventColliders = Pool.GetList<Collider>();
-
         public static ConfigData Configuration { get; set; }
 
         public static EventResults LastEventResult { get; private set; }
@@ -841,8 +839,6 @@ namespace Oxide.Plugins
 
             private double _startsAtTime;
 
-            public List<Collider> roomcolliders = new List<Collider>();
-
             internal GameRoom gameroom;
 
             internal string TeamAColor { get; set; }
@@ -1398,7 +1394,6 @@ namespace Oxide.Plugins
                 player.OnNetworkGroupChange();              // Updates children objects of main BaseNetworkable
                 player.SendChildrenNetworkUpdateImmediate();
                 player.SendEntityUpdate();
-                IsolateColliders(player);
             }
 
             /// <summary>
@@ -1419,52 +1414,6 @@ namespace Oxide.Plugins
                 player.SendChildrenNetworkUpdateImmediate();
                 player.SendNetworkUpdateImmediate(false);
                 player.SendEntityUpdate();
-                UnIsolateColliders(player);
-            }
-            /// <summary>
-            /// Isolates player colliders from other game rooms
-            /// </summary>
-            protected virtual void IsolateColliders(BasePlayer player)
-            {
-                roomcolliders.AddRange(player.GetComponentsInChildren<Collider>(true));
-                foreach (Collider playerCollider in player.gameObject.GetComponentsInChildren<Collider>(true))
-                {
-                    foreach (Collider othercollider in AllEventColliders)
-                    {
-                        if (othercollider == null || playerCollider == null)
-                            continue;
-                        Physics.IgnoreCollision(othercollider, playerCollider, true);
-                    }
-                }
-                AllEventColliders.AddRange(roomcolliders);
-            }
-
-            /// <summary>
-            /// Switches collisions only for lobby players and objects
-            /// </summary>
-            protected virtual void UnIsolateColliders(BasePlayer player)
-            {
-                List<Collider> playerColliders = Pool.GetList<Collider>();
-                playerColliders = player.GetComponentsInChildren<Collider>(true).ToList();
-                roomcolliders.RemoveAll(x => playerColliders.Contains(x));
-
-                //Ignoring left game room
-                foreach (Collider playerCollider in player.gameObject.GetComponentsInChildren<Collider>(true))
-                {
-                    foreach (Collider roomcollider in roomcolliders)
-                    {
-                        if (roomcollider == null || playerCollider == null)
-                            continue;
-                        Physics.IgnoreCollision(roomcollider, playerCollider, true);
-                    }
-                }
-                
-
-                //Activating lobby collisions
-                foreach (Collider playerCollider in playerColliders)
-                    foreach (Collider roomcollider in GetLobbyColliders().Where(x => !playerColliders.Contains(x)))
-                        Physics.IgnoreCollision(roomcollider, playerCollider, false);
-                Pool.FreeList(ref playerColliders);
             }
 
             /// <summary>
@@ -1987,34 +1936,17 @@ namespace Oxide.Plugins
             internal void OnEntityDeployed(BaseCombatEntity entity) => _deployedObjects.Add(entity);
 
             /// <summary>
-            /// Adds Item to Room and manages colliders
+            /// Adds Item to Room
             /// </summary>
             public void AddItemToRoom(BaseEntity entity)
             {
                 roomobjects.Add(entity);
                 entity.gameObject.AddComponent<NetworkGroupData>().Enable(Convert.ToUInt32(gameroom.roomID));
                 entity.net.SwitchGroup(Net.sv.visibility.Get(Convert.ToUInt32(gameroom.roomID)));
-                roomcolliders.AddRange(entity.GetComponentsInChildren<Collider>(true));
                 
-                List<Collider> otherColliders = Pool.GetList<Collider>();
-                otherColliders = AllEventColliders;
-                foreach (Collider collider in roomcolliders)
-                    if (otherColliders.Contains(collider))
-                        otherColliders.Remove(collider);
-
-                foreach (Collider colliderinroom in roomcolliders)
-                {
-                    foreach (Collider othercollider in otherColliders)
-                    {
-                        if (othercollider != null && colliderinroom != null)
-                            Physics.IgnoreCollision(othercollider, colliderinroom, true);
-                    }
-                }
                 //entity.SendNetworkGroupChange();
                 //entity.SendNetworkUpdateImmediate(false);
                 entity.gameObject.AddComponent<BaseEventObject>();
-
-                Pool.FreeList(ref otherColliders);
             }
 
             /// <summary>
@@ -2025,23 +1957,7 @@ namespace Oxide.Plugins
                 staticobjects.Add(staticentity);
                 staticentity.gameObject.AddComponent<NetworkGroupData>().Enable(Convert.ToUInt32(gameroom.roomID));
                 staticentity.net.SwitchGroup(Net.sv.visibility.Get(Convert.ToUInt32(gameroom.roomID)));
-                roomcolliders.AddRange(staticentity.GetComponentsInChildren<Collider>(true));
                 
-                List<Collider> otherColliders = Pool.GetList<Collider>();
-                otherColliders = AllEventColliders;
-                foreach (Collider collider in roomcolliders)
-                    if (otherColliders.Contains(collider))
-                        otherColliders.Remove(collider);
-
-                foreach (Collider colliderinroom in roomcolliders)
-                {
-                    foreach (Collider othercollider in otherColliders)
-                    {
-                        if (othercollider != null && colliderinroom != null)
-                            Physics.IgnoreCollision(othercollider, colliderinroom, true);
-                    }
-                }
-                Pool.FreeList(ref otherColliders);
                 staticentity.SendNetworkUpdateImmediate();
             }
 
@@ -2660,6 +2576,7 @@ namespace Oxide.Plugins
                 Player.SetParent(null, false, false);
                 Player.SetPlayerFlag(BasePlayer.PlayerFlags.Spectating, false);
                 Player.gameObject.SetLayerRecursive(17);
+                Interface.CallHook("OnEventSpectateEnded", Player);
             }
 
             public void SetSpectateTarget(BaseEventPlayer eventPlayer)
@@ -2699,6 +2616,7 @@ namespace Oxide.Plugins
                 }
 
                 Pool.FreeList(ref list);
+                Interface.CallHook("OnSpectateTargetUpdated", Player, SpectateTarget);
             }
         }
         
@@ -3292,20 +3210,7 @@ namespace Oxide.Plugins
                 return entities;
             return null;
         }
-
-        /// <summary>
-        /// Used for restoring player's collisions to its default
-        /// </summary>
-        /// <returns>Returns player and object colliders of lobby</returns>
-        public static List<Collider> GetLobbyColliders()
-        {
-            List<Collider> colliders = Pool.GetList<Collider>();
-            IEnumerable<BaseNetworkable> lobbyentities = BaseEntity.serverEntities.Where(x => GetRoomofPlayer(x as BasePlayer) == null && !x.gameObject.HasComponent<BaseEventObject>());
-            foreach (BaseEntity entity in lobbyentities)
-                colliders.AddRange(entity.gameObject.GetComponentsInChildren<Collider>(true));
-            return colliders.Where(x => !(x is TerrainCollider)).ToList();
-        }
-
+        
         /// <summary>
         /// Get all players of any game room
         /// </summary>
@@ -3771,7 +3676,6 @@ namespace Oxide.Plugins
         private const string admineditroom_UI = "eventmanager.admineditroom.ui";
         public class AdminEditStaticsRoom
         {
-            List<Collider> roomcolliders = Pool.GetList<Collider>();
             public List<BaseEntity> staticobjects = Pool.GetList<BaseEntity>();
             private uint roomID;
             public EventConfig eventConfig;
@@ -3792,7 +3696,6 @@ namespace Oxide.Plugins
                     FinishEditing(player,false);
                 }
                 Pool.FreeList(ref staticobjects);
-                Pool.FreeList(ref roomcolliders);
             }
 
             public void StartEditing(ConsoleSystem.Arg args)
@@ -3853,7 +3756,6 @@ namespace Oxide.Plugins
                 canEntitiesBeRemoved = false;
                 StaticObjectCreator.Remove(player.userID);
                 Pool.FreeList(ref staticobjects);
-                Pool.FreeList(ref roomcolliders);
                 AdminEditingRooms.Remove(Convert.ToInt32(roomID));
                 DestroyAdminUI(player);
             }
@@ -3862,23 +3764,7 @@ namespace Oxide.Plugins
                 staticobjects.Add(staticentity);
                 staticentity.gameObject.AddComponent<NetworkGroupData>().Enable(roomID);
                 staticentity.net.SwitchGroup(Net.sv.visibility.Get(roomID));
-                roomcolliders.AddRange(staticentity.GetComponentsInChildren<Collider>(true));
-                    
-                List<Collider> otherColliders = Pool.GetList<Collider>();
-                otherColliders = AllEventColliders;
-                foreach (Collider collider in roomcolliders)
-                    if (otherColliders.Contains(collider))
-                        otherColliders.Remove(collider);
-
-                foreach (Collider colliderinroom in roomcolliders)
-                {
-                    foreach (Collider othercollider in otherColliders)
-                    {
-                        if (othercollider != null && colliderinroom != null)
-                            Physics.IgnoreCollision(othercollider, colliderinroom, true);
-                    }
-                }
-                Pool.FreeList(ref otherColliders);
+                
                 staticentity.SendNetworkUpdateImmediate();
                 RefreshUIForAll();
             }
