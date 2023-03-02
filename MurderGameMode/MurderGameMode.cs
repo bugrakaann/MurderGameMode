@@ -94,6 +94,16 @@ namespace Oxide.Plugins
             }
         }
 
+        void OnSpectateTargetUpdated(BasePlayer player, EventManager.BaseEventPlayer spectateTarget)
+        {
+            MurderPlayer murderPlayer = spectateTarget as MurderPlayer;
+            MurderGame.SendRoleNamePanel(player,murderPlayer.playerRole);
+        }
+
+        void OnEventSpectateEnded(BasePlayer player)
+        {
+            CuiHelper.DestroyUi(player, name_UI);
+        }
         #region BetterChat
 
         private void MutePlayer(ulong userID)
@@ -363,7 +373,9 @@ namespace Oxide.Plugins
             void SwitchName(EventManager.BaseEventPlayer player)
             {
                 player.Player.displayName = (player as MurderPlayer).playerRole.roleName;
-                // çalışmıyorr
+                // This is needed to update overhead name tag
+                player.Player.limitNetworking = true;
+                player.Player.limitNetworking = false;
             }
             #endregion
             #region Overrides
@@ -401,7 +413,7 @@ namespace Oxide.Plugins
 
                     //UI sound effect for each individual player
                     RunEffect(player.Player.ServerPosition, "assets/bundled/prefabs/fx/item_unlock.prefab", player.Player);
-                    SendRoleNamePanel(player as MurderPlayer);
+                    SendRoleNamePanel((player as MurderPlayer).Player,(player as MurderPlayer).playerRole);
                      SendRoleUI(player);
 
                     SpawnPlayer(player, true);
@@ -489,16 +501,33 @@ namespace Oxide.Plugins
                 MurderPlayer eventPlayer = EventManager.GetUser(player) as MurderPlayer;
                 if (eventPlayer != null && eventPlayer?.playerRole != null)
                     player.displayName = eventPlayer.playerRole.realName;
-
+                
                 if(player.HasComponent<DisplayRoleNameBehaviour>())
                      DestroyImmediate(player.GetComponent<DisplayRoleNameBehaviour>());
+                FartEffect fartEffect;
+                if(player.TryGetComponent(out fartEffect))
+                    DestroyImmediate(fartEffect);
+                
+                if (eventPlayer?.playerRole?.playerRole == PlayerRole.Murderer)
+                {
+                    RestartEvent();
+                    BroadcastToRoom("Murderer left the game!");
+                }
                 base.LeaveEvent(player);
             }
             internal override void LeaveEvent(EventManager.BaseEventPlayer eventPlayer)
             {
                 eventPlayer.Player.displayName = (eventPlayer as MurderPlayer).playerRole.realName;
+                FartEffect fartEffect;
+                if(eventPlayer.Player.TryGetComponent(out fartEffect))
+                    DestroyImmediate(fartEffect);
                 if (eventPlayer.Player.HasComponent<DisplayRoleNameBehaviour>())
                     DestroyImmediate(eventPlayer.Player.GetComponent<DisplayRoleNameBehaviour>());
+
+                if ((eventPlayer as MurderPlayer)?.playerRole?.playerRole == PlayerRole.Murderer)
+                {
+                    RestartEvent();
+                }
                 base.LeaveEvent(eventPlayer);
             }
             protected override bool CanDropBackpack() { return false;}
@@ -519,9 +548,17 @@ namespace Oxide.Plugins
                         murderPlayer.playerRole.roleColor = droppedEventCorpse.corpseRole.roleColor;
                         murderPlayer.playerRole.roleName = droppedEventCorpse.corpseRole.roleName;
                         murderPlayer.playerRole.roleColorName = droppedEventCorpse.corpseRole.roleColorName;
-                        murderPlayer.Player.inventory.containerWear = corpse.containers.FirstOrDefault(x => x.flags == ItemContainer.Flag.Clothing);
+                        murderPlayer.Player.inventory.containerWear.Clear();
+                        foreach (Item item in corpse.containers[1].itemList)
+                        {
+                            Item newItem =ItemManager.Create(item.info, 1, item.skin);
+                            murderPlayer.Player.inventory.containerWear.Insert(newItem);
+                        }
                         murderPlayer.Player.SendFullSnapshot();
-                        SendRoleNamePanel(murderPlayer);
+                        murderPlayer.playerRole.collectedItems--;
+                        SendRoleNamePanel(murderPlayer.Player,murderPlayer.playerRole);
+                        BroadcastToPlayer(player,$"You disguised to <color={murderPlayer.playerRole.roleColor}>{murderPlayer.playerRole.roleName}</color>");
+                        RunEffect(player.ServerPosition,"assets/prefabs/deployable/locker/sound/equip_zipper.prefab",player);
                     }
                     return false;
                 }
@@ -531,10 +568,10 @@ namespace Oxide.Plugins
             internal override void OnPlayerTakeDamage(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
             {
                 base.OnPlayerTakeDamage(eventPlayer, hitInfo);
-                if (hitInfo?.Weapon?.ShortPrefabName == "pistol.python" ||
-                    hitInfo.Weapon?.ShortPrefabName == "knife.combat")
+                if (hitInfo?.Weapon?.ShortPrefabName == "python.entity" ||
+                    hitInfo.Weapon?.ShortPrefabName == "knife.combat.entity")
                 {
-                    hitInfo.damageTypes.ScaleAll(100);
+                    hitInfo.damageTypes.ScaleAll(100f);
                 }
             }
             
@@ -558,7 +595,7 @@ namespace Oxide.Plugins
                     }
                     
                     item.Remove();
-                    SendRoleNamePanel(murderPlayer);
+                    SendRoleNamePanel(murderPlayer.Player, murderPlayer.playerRole);
                     return null;
                 }
                 return false;
@@ -649,9 +686,21 @@ namespace Oxide.Plugins
 
             internal override void PrePlayerDeath(EventManager.BaseEventPlayer eventPlayer, HitInfo hitInfo)
             {
+                BasePlayer baseAttacker = hitInfo?.InitiatorPlayer;
+                MurderPlayer attacker = EventManager.GetUser(baseAttacker) as MurderPlayer;
+                MurderPlayer victim = eventPlayer as MurderPlayer;
+
                 if(CanDropBody())
                     eventPlayer.DropBody(hitInfo);
+                
                 base.PrePlayerDeath(eventPlayer, hitInfo);
+                if (victim.playerRole.playerRole != PlayerRole.Murderer &&
+                    hitInfo.Weapon?.ShortPrefabName == "python.entity")
+                {
+                    attacker.Player.GoToCrawling(null);
+                    (victim.Event as MurderGame).DropRevolver(attacker?.Player, 7);
+                    BroadcastToPlayer(attacker,"You've shot the wrong person!");
+                }
             }
 
             protected override void GetWinningPlayers(ref List<EventManager.BaseEventPlayer> winners)
@@ -819,17 +868,17 @@ namespace Oxide.Plugins
                 UI.Label(container, death_UI, $"{rolename}", 15, UI.TransformToUI4(259f + plusx, 394f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
                 UI.Label(container, death_UI, $"{collecteditem}", 15, UI.TransformToUI4(409f + plusx, 435f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
             }
-            void SendRoleNamePanel(MurderPlayer murderPlayer)
+            public static void SendRoleNamePanel(BasePlayer target,MurderPlayer.MurderRole playerRole)
             {
                 UI4 dimension = new UI4(0f, 0f, 0.078f, 0.176f);
                 CuiElementContainer container = UI.Container(name_UI, "0 0 0 0", dimension);
-                string url = EMInterface.Instance.GetImage($"{murderPlayer.playerRole.roleColorName}nameUI");
+                string url = EMInterface.Instance.GetImage($"{playerRole.roleColorName}nameUI");
                 UI.Image(container, name_UI, url, new UI4(0f, 0f, 1f, 0.789f));
-                string color = UI.Color(murderPlayer.playerRole.roleColor, 1);
-                UI.Label(container, name_UI, murderPlayer.playerRole.roleName, 18, new UI4(0f, 0.751f, 1f, 0.93f), TextAnchor.MiddleCenter, color);
-                UI.Label(container, name_UI, murderPlayer.playerRole.collectedItems.ToString(), 45, new UI4(0.35f, 0.121f, 0.66f, 0.668f), TextAnchor.MiddleCenter, "1 1 1 1");
-                CuiHelper.DestroyUi(murderPlayer.Player, name_UI);
-                CuiHelper.AddUi(murderPlayer.Player, container);
+                string color = UI.Color(playerRole.roleColor, 1);
+                UI.Label(container, name_UI, playerRole.roleName, 18, new UI4(0f, 0.751f, 1f, 0.93f), TextAnchor.MiddleCenter, color);
+                UI.Label(container, name_UI, playerRole.collectedItems.ToString(), 45, new UI4(0.35f, 0.121f, 0.66f, 0.668f), TextAnchor.MiddleCenter, "1 1 1 1");
+                CuiHelper.DestroyUi(target, name_UI);
+                CuiHelper.AddUi(target, container);
             }
             internal void DestroyRoomUI(BasePlayer player)
             {
@@ -978,13 +1027,6 @@ namespace Oxide.Plugins
                     (Event as MurderGame).innocentCount--;
                 }
 
-                if (playerRole.playerRole != PlayerRole.Murderer &&
-                    attacker?.playerRole.playerRole == PlayerRole.Sheriff)
-                {
-                    attacker.Player.GoToCrawling(null);
-                    (Event as MurderGame).DropRevolver(Player, 7);
-                }
-
                 if (attacker?.playerRole.playerRole == PlayerRole.Murderer)
                 {
                     attacker.ResetFartTimer();
@@ -1026,7 +1068,7 @@ namespace Oxide.Plugins
 
             internal void Fart()
             {
-                if (Player == null)
+                if (this == null)
                 {
                     fartTimer.DestroyToPool();
                     return;
