@@ -483,9 +483,9 @@ namespace Oxide.Plugins
                 }
                 else
                 {
-                    BroadcastToPlayers(string.Format(Instance.Message("NeededPlayer"),GetNeededRequiredPlayers()));
+                    BroadcastToRoom(string.Format(Instance.Message("NeededPlayer"),GetNeededRequiredPlayers()));
                 }
-                SendRoomHelper(player,this.gameroom);
+                SendRoomHelper(player, gameroom);
                 base.OnPlayerJoined(player);
             }
 
@@ -557,6 +557,7 @@ namespace Oxide.Plugins
                         }
                         murderPlayer.Player.SendFullSnapshot();
                         murderPlayer.playerRole.collectedItems--;
+                        murderPlayer.playerRole.isDisguised = true;
                         SendRoleNamePanel(murderPlayer.Player,murderPlayer.playerRole);
                         BroadcastToPlayer(player,$"You disguised to <color={murderPlayer.playerRole.roleColor}>{murderPlayer.playerRole.roleName}</color>");
                         RunEffect(player.ServerPosition,"assets/prefabs/deployable/locker/sound/equip_zipper.prefab",player);
@@ -758,8 +759,7 @@ namespace Oxide.Plugins
                 SpawnPlayer(eventPlayer, Status == EventManager.EventStatus.Started, false);
                 if (Status == EventManager.EventStatus.Prestarting)
                 {
-                    System.Random random = new System.Random();
-                    int index = random.Next(1,3);
+                    int index = random.Next(1,4);
                     EventManager.GiveKit(player,$"prestartingcostume{index}");
                 }
 
@@ -823,7 +823,7 @@ namespace Oxide.Plugins
                 string murderlabel = EMInterface.Instance.GetImage("murder");
                 foreach (BasePlayer player in EventManager.GetPlayersOfRoom(this))
                 {
-                    CuiElementContainer container = UI.Container(death_UI, UI.Color("#232323", 1), UI.TransformToUI4(360f, 1560f, 190f, 890f), true);
+                    CuiElementContainer container = UI.Container(death_UI, UI.Color("#232323", 1), UI.TransformToUI4(360f, 1560f, 190f, 890f), true,"Overall");
                     UI.Panel(container, death_UI, UI.Color("#2e2e2e", 1), UI.TransformToUI4(15f, 1185f, 510f, 660f, 1200f, 700f));    //upper panel
                     UI.Panel(container, death_UI, UI.Color("#2e2e2e", 1), UI.TransformToUI4(15f, 855f, 105f, 505f, 1200f, 700f));     //left panel
                     UI.Panel(container, death_UI, UI.Color("#2e2e2e", 1), UI.TransformToUI4(860f, 1185f, 105f, 505f, 1200f, 700f));   //right panel
@@ -836,7 +836,7 @@ namespace Oxide.Plugins
                     else if (winnerside == EventWinner.Bystanders)
                         UI.Image(container, death_UI, bystanderswinpng, UI.TransformToUI4(37f, 420f, 580f, 639f, 1200f, 700f));
 
-                    UI.Label(container, death_UI, $"The murderer was <color={murderer.playerRole.roleColor}>{murderer.playerRole.roleName} </color>", 18, UI.TransformToUI4(45f, 353f, 540f, 575f, 1200f, 700f), TextAnchor.MiddleLeft);
+                    UI.Label(container, death_UI, $"The murderer was {((murderer.playerRole.IsDisguised()) ? $"<color={murderer.playerRole.GetRealRoleColor()}>{murderer.playerRole.GetRealRoleName()} </color> (<color={murderer.playerRole.roleColor}>{murderer.playerRole.roleName} </color>)" : $"<color={murderer.playerRole.roleColor}>{murderer.playerRole.roleName} </color>")}", 18, UI.TransformToUI4(45f, 353f, 540f, 575f, 1200f, 700f), TextAnchor.MiddleLeft);
 
                     for (int i = 0; i < EventManager.GetPlayersOfRoom(this).Count; i++)
                     {
@@ -874,9 +874,10 @@ namespace Oxide.Plugins
                 const int ELEMENT_WIDTH = 410;
                 int minusy = ELEMENT_HEIGHT * (position % 10);
                 int plusx = ELEMENT_WIDTH * (position / 10);
-                UI.Label(container, death_UI, $"{username}", 15, UI.TransformToUI4(45f + plusx, 240f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
-                UI.Label(container, death_UI, $"{rolename}", 15, UI.TransformToUI4(259f + plusx, 394f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
-                UI.Label(container, death_UI, $"{collecteditem}", 15, UI.TransformToUI4(409f + plusx, 435f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
+                string shortenedName = (username.Length > 19) ? username.Substring(0, 19) : username;
+                UI.Label(container, death_UI, shortenedName, 15, UI.TransformToUI4(45f + plusx, 240f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
+                UI.Label(container, death_UI, rolename, 15, UI.TransformToUI4(259f + plusx, 394f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
+                UI.Label(container, death_UI, collecteditem.ToString(), 15, UI.TransformToUI4(409f + plusx, 435f + plusx, 416f - minusy, 441f - minusy, 1200f, 700f), TextAnchor.MiddleLeft, color);
             }
             public static void SendRoleNamePanel(BasePlayer target,MurderPlayer.MurderRole playerRole)
             {
@@ -1164,6 +1165,9 @@ namespace Oxide.Plugins
                 public int collectedItems;
                 public string roleColor;
                 public string roleColorName;
+                private string realroleName;
+                private string realroleColor;
+                public bool isDisguised = false;
                 /// <summary>
                 /// Create new murder role
                 /// </summary>
@@ -1179,7 +1183,29 @@ namespace Oxide.Plugins
                     roleColorName = _rolecolorname;
                     roleColor = _roleColor;
                     realName = _realname;
+                    if (_playerrole == PlayerRole.Murderer)
+                    {
+                        realroleColor = roleColor;
+                        realroleName = _rolename;
+                    }
                 }
+
+                public string GetRealRoleName()
+                {
+                    if (string.IsNullOrEmpty(realroleName))
+                        return roleName;
+                    return realroleName;
+                }
+
+                public string GetRealRoleColor()
+                {
+                    if (string.IsNullOrEmpty(realroleColor))
+                        return roleColor;
+                    return realroleColor;
+                }
+                public bool IsMurderer() => playerRole == PlayerRole.Murderer;
+                public bool IsSheriff() => playerRole == PlayerRole.Sheriff;
+                public bool IsDisguised() => isDisguised;
             }
         }
         public class DisplayRoleNameBehaviour : MonoBehaviour
