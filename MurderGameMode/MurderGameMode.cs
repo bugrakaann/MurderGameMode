@@ -419,6 +419,7 @@ namespace Oxide.Plugins
                     SpawnPlayer(player, true);
                     // Giving suits to player
                     MurderSkinManager.SkinPreferences preference = MurderSkinManager.GetPreferencesOfPlayer(player.Player);
+                    EventManager.StripInventory(player.Player);
                     EventManager.GiveKit(player.Player, preference.costume);
                     InvokeHandler.InvokeRepeating(this, SpawnRandomItems,0f,Configuration.itemspawndelay);
                     player.Player.SendNetworkUpdate();
@@ -583,6 +584,7 @@ namespace Oxide.Plugins
             {
                 MurderPlayer murderPlayer = EventManager.GetUser(player) as MurderPlayer;
                 if (murderPlayer.playerRole.playerRole == PlayerRole.Murderer && item.info.shortname == "knife.combat") return null;
+                else if (murderPlayer.CanTakeRevolver(item)) return null;
 
                 //Sheriffin birisini vurduktan sonra silahı geri alamaması
                 if (item.GetWorldEntity().gameObject.HasComponent<CollectableItem>())
@@ -698,8 +700,9 @@ namespace Oxide.Plugins
                     hitInfo.Weapon?.ShortPrefabName == "python.entity")
                 {
                     attacker.Player.GoToCrawling(null);
+                    attacker.StartRevolverTimer();
                     (victim.Event as MurderGame).DropRevolver(attacker?.Player, 7);
-                    BroadcastToPlayer(attacker,"You've shot the wrong person!");
+                    BroadcastToPlayer(attacker, $"You killed an innocent. Revolver block for {Configuration.revolvertimeBlock} minutes.");
                 }
             }
 
@@ -751,7 +754,14 @@ namespace Oxide.Plugins
                 //if (!Config.AllowClassSelection || GetAvailableKits(eventPlayer.Team).Count <= 1)
                 //    eventPlayer.Kit = GetAvailableKits(team).First();
 
+                //Give game costumes or prestarting costumes
                 SpawnPlayer(eventPlayer, Status == EventManager.EventStatus.Started, false);
+                if (Status == EventManager.EventStatus.Prestarting)
+                {
+                    System.Random random = new System.Random();
+                    int index = random.Next(1,3);
+                    EventManager.GiveKit(player,$"prestartingcostume{index}");
+                }
 
                 if (!string.IsNullOrEmpty(Config.ZoneID))
                     EventManager.Instance.ZoneManager?.Call("AddPlayerToZoneWhitelist", Config.ZoneID, player);
@@ -797,7 +807,7 @@ namespace Oxide.Plugins
                         CCTV_RC cctvCam = staticCamera.staticEntity as CCTV_RC;
                         string cctvIdentifier = gameroom.roomID.ToString() + cctvCam.net.ID;
                         cctvCam.UpdateIdentifier(cctvIdentifier);
-                        computerStation.controlBookmarks.Add(cctvCam.GetIdentifier(),cctvCam.net.ID);
+                        computerStation.controlBookmarks.Add(cctvCam.GetIdentifier());
                     }
                 }
             }
@@ -992,6 +1002,7 @@ namespace Oxide.Plugins
         public class MurderPlayer : EventManager.BaseEventPlayer
         {
             internal Timer fartTimer;
+            private Timer sheriffRevolverTimer;
             internal MurderRole playerRole;
             public void MurderPlayerInit()
             {
@@ -1066,7 +1077,7 @@ namespace Oxide.Plugins
                 }
             }
 
-            internal void Fart()
+            private void Fart()
             {
                 if (this == null)
                 {
@@ -1077,7 +1088,6 @@ namespace Oxide.Plugins
                 effect.InitializeEffect(Convert.ToUInt32(Event.gameroom.roomID));
                 fartTimer = Instance.timer.In(2 * 60, Fart);
             }
-
             internal void StartFartTimer()
             {
                 if (playerRole.playerRole == PlayerRole.Murderer)
@@ -1095,7 +1105,6 @@ namespace Oxide.Plugins
                     fartTimer = null;
                 }
             }
-
             internal void ResetFartTimer()
             {
                 FartEffect fartEffect;
@@ -1104,9 +1113,42 @@ namespace Oxide.Plugins
                     DestroyImmediate(fartEffect);
                 }
                 fartTimer.DestroyToPool();
-                fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
+                if(Instance != null)
+                    fartTimer = Instance.timer.In(Configuration.startFarting * 60, Fart);
             }
 
+            internal bool CanTakeRevolver(Item item)
+            {
+                if (item.info.shortname != "pistol.python")
+                    return false;
+                
+                if (playerRole.playerRole == PlayerRole.Murderer)
+                {
+                    BroadcastToPlayer(Player,"You are murderer. You cant use revolver");
+                    return false;
+                }
+                else if (sheriffRevolverTimer != null)
+                {
+                    BroadcastToPlayer(Player,"You have revolver block.");
+                    return false;
+                }
+                else if (HasRevolver())
+                {
+                    BroadcastToPlayer(Player, "You already have a revolver");
+                    return false;
+                }
+                return true;
+            }
+
+            internal void StartRevolverTimer()
+            {
+                sheriffRevolverTimer = Instance.timer.In(Configuration.revolvertimeBlock * 60, () =>
+                {
+                    sheriffRevolverTimer?.Destroy();
+                    sheriffRevolverTimer = null;
+                });
+            }
+            
             internal bool HasRevolver()
             {
                 Item revolver = Player.inventory.containerMain.FindItemsByItemName("pistol.python");
@@ -1372,6 +1414,8 @@ namespace Oxide.Plugins
             public float woundedDuration { get; set; }
             [JsonProperty("Murderer start farting after ... minutes")]
             public float startFarting { get; set; }
+            [JsonProperty("Sheriff&Bystander will be able to get revolver after.... minutes")]
+            public float revolvertimeBlock { get; set; }
         }
 
         protected override void LoadConfig()
@@ -1522,7 +1566,8 @@ namespace Oxide.Plugins
                     -2107018088 //shovel bass
                 },
                 woundedDuration = 25f,
-                startFarting = 5f
+                startFarting = 5f,
+                revolvertimeBlock = 2f
             };
         }
 
