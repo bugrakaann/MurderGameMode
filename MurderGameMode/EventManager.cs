@@ -15,13 +15,9 @@ using UnityEngine;
 using System.Linq;
 using Network;
 using Facepunch;
-using JetBrains.Annotations;
 using UI = Oxide.Plugins.EMInterface.UI;
 using UI4 = Oxide.Plugins.EMInterface.UI4;
-using Network.Visibility;
 using Newtonsoft.Json.Linq;
-using ProtoBuf;
-using UnityEngine.Android;
 
 namespace Oxide.Plugins
 {
@@ -156,12 +152,12 @@ namespace Oxide.Plugins
             }
             UnlockInventory(player);
             //Waking up without respawn screen
-            NextFrame(() =>
-            {
-                player.LifeStoryEnd();
-                player.Respawn();
-                player.EndSleeping();
-            });
+            // NextFrame(() =>
+            // {
+            //     player.LifeStoryEnd();
+            //     player.Respawn();
+            //     player.EndSleeping();
+            // });
         }
        
         private void OnPlayerDisconnected(BasePlayer player)
@@ -176,13 +172,13 @@ namespace Oxide.Plugins
             }
 
             // Destroying player
-            // if (!player.IsDestroyed || player.IsAlive())
-            //     NextFrame(() =>
-            //     {
-            //         StripInventory(player);
-            //         player.lifestate = BaseCombatEntity.LifeState.Dead;
-            //         player.Kill();
-            //     });
+            if (!player.IsDestroyed || player.IsAlive())
+                NextFrame(() =>
+                {
+                    StripInventory(player);
+                    player.Kill();
+                    player.ResetLifeStateOnSpawn = true;
+                });
         }
         void OnEntityKill(BaseEntity entity)
         {
@@ -881,15 +877,14 @@ namespace Oxide.Plugins
                 CleanupEntities();
                 CleanupStaticEntities();
 
-                for (int i = eventPlayers.Count - 1; i >= 0; i--)
+                foreach (BaseEventPlayer eventPlayer in eventPlayers)
                 {
-                    BaseEventPlayer eventPlayer = eventPlayers[i];
-
                     if (eventPlayer.IsDead)
                         ResetPlayer(eventPlayer);
 
                     LeaveEvent(eventPlayer);
                 }
+                
                 foreach (BasePlayer player in spectators)
                 {
                     ResetPlayer(player);
@@ -961,6 +956,7 @@ namespace Oxide.Plugins
             {
                 _isClosed = false;
                 Status = EventManager.EventStatus.Open;
+                Instance.LobbyRoomSystem.Call("RefreshLobbyUI");
 
                 if (Configuration.Message.Announce)
                 {
@@ -1047,6 +1043,7 @@ namespace Oxide.Plugins
                         OnPlayerRespawn(eventPlayer);
                     }
                 });
+                Instance.LobbyRoomSystem.Call("RefreshLobbyUI");
             }
 
             /// <summary>
@@ -1091,7 +1088,7 @@ namespace Oxide.Plugins
             internal virtual void RestartEvent()
             {
                 Timer.StopTimer();
-                Timer.StartTimer(10, string.Empty, PrestartEvent);
+                Timer.StartTimer(10, "Game Restarting", PrestartEvent);
                 foreach (BasePlayer player in GetPlayersOfRoom(this))
                     ResetPlayer(player);
 
@@ -1371,7 +1368,7 @@ namespace Oxide.Plugins
 
                 if (!Config.AllowClassSelection || GetAvailableKits(eventPlayer.Team).Count <= 1)
                     eventPlayer.Kit = GetAvailableKits(team).First();
-
+                
                 SpawnPlayer(eventPlayer, Status == EventManager.EventStatus.Started, false);
 
                 if (!string.IsNullOrEmpty(Config.ZoneID))
@@ -1487,6 +1484,26 @@ namespace Oxide.Plugins
                 eventPlayer.ApplyInvincibility();
 
                 OnPlayerSpawned(eventPlayer);
+            }
+            
+            /// <summary>
+            /// Spawn's the player in the arena used for spectators
+            /// </summary>
+            internal void SpawnPlayer(BasePlayer player, bool sleep = false)
+            {
+                if (player == null)
+                    return;
+
+                player.GetMounted()?.AttemptDismount(player);
+
+                if (player.HasParent())
+                    player.SetParent(null, true);
+
+                StripInventory(player);
+
+                ResetMetabolism(player);
+
+                MovePosition(player, _spawnSelectorA.GetSpawnPoint(), sleep);
             }
 
             /// <summary>
@@ -1805,7 +1822,7 @@ namespace Oxide.Plugins
             internal virtual void GetSpectateTargets(ref List<BaseEventPlayer> list)
             {
                 list.Clear();
-                list.AddRange(eventPlayers);
+                list.AddRange(eventPlayers.Where(x => !x.IsDead));
             }
 
             /// <summary>
@@ -1816,18 +1833,15 @@ namespace Oxide.Plugins
             {
                 List<BaseEventPlayer> list = Pool.GetList<BaseEventPlayer>();
                 GetSpectateTargets(ref list);
-
-                bool hasValidSpectateTargets = list.Count > 0;
-
-                for (int i = 0; i < eventPlayers.Count; i++)
+                
+                for (int i = 0; i < spectators.Count; i++)
                 {
-                    BaseEventPlayer eventPlayer = eventPlayers[i];
-
-                    if (eventPlayer.Player.IsSpectating() && eventPlayer.SpectateTarget == victim)
+                    BasePlayer spectator = spectators[i];
+                    RoomSpectatingBehaviour spectatingBehaviour = spectator.GetComponent<RoomSpectatingBehaviour>();
+                    
+                    if (spectator.IsSpectating() && spectatingBehaviour.SpectateTarget == victim)
                     {
-                        if (hasValidSpectateTargets)
-                            eventPlayer.GetComponent<RoomSpectatingBehaviour>().UpdateSpectateTarget();
-                        else eventPlayer.GetComponent<RoomSpectatingBehaviour>().FinishSpectating();
+                        spectatingBehaviour.UpdateSpectateTarget();
                     }
                 }
             }
@@ -2267,7 +2281,7 @@ namespace Oxide.Plugins
 
                 Player.health = Player.MaxHealth();
 
-                Player.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                Player.SendNetworkUpdate();
 
                 Player.SetPlayerFlag(BasePlayer.PlayerFlags.Wounded, false);
 
@@ -2564,7 +2578,6 @@ namespace Oxide.Plugins
                     return;
 
                 UpdateSpectateTarget();
-                Player.StartSpectating();
                 Player.ChatMessage(Message("Notification.SpectateCycle", Player.userID));
             }
 
@@ -2596,25 +2609,24 @@ namespace Oxide.Plugins
 
                 Event.GetSpectateTargets(ref list);
 
-                if (list.Count > 1)
+                if (list.IsEmpty())
                 {
-                    int newIndex = (int)Mathf.Repeat(_spectateIndex += 1, list.Count - 1);
-
-                    if (list[newIndex] != SpectateTarget)
-                    {
-                        _spectateIndex = newIndex;
-                        SetSpectateTarget(list[_spectateIndex]);
-                    }
-                }
-                else
-                {
-                    if (list[0] != SpectateTarget)
-                    {
-                        _spectateIndex = 0;
-                        SetSpectateTarget(list[_spectateIndex]);
-                    }
+                    FinishSpectating();
+                    Event.SpawnPlayer(Player);
+                    DestroyImmediate(this);
+                    return;
                 }
 
+                int newIndex = (int)Mathf.Repeat(_spectateIndex, list.Count);
+
+                if (list[newIndex] != SpectateTarget)
+                {
+                    _spectateIndex = newIndex;
+                    SetSpectateTarget(list[_spectateIndex]);
+                    _spectateIndex++;
+                }
+                Player.StartSpectating();
+                
                 Pool.FreeList(ref list);
                 Interface.CallHook("OnSpectateTargetUpdated", Player, SpectateTarget);
             }
@@ -3168,10 +3180,9 @@ namespace Oxide.Plugins
         public enum EventStatus { Finished, Open, Prestarting, Started }
         
         public enum Team { A, B, None }
-        public enum roomPlace { House, Hospital, Island }
         #endregion
 
-        #region Helpers  
+        #region Helpers
         private T ParseType<T>(string type)
         {
             try
