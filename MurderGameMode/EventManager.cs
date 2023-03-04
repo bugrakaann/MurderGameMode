@@ -180,6 +180,11 @@ namespace Oxide.Plugins
                     player.ResetLifeStateOnSpawn = true;
                 });
         }
+        object OnTeamCreate(BasePlayer player)
+        {
+            // Player is never able to create team
+            return false;
+        }
         void OnEntityKill(BaseEntity entity)
         {
             foreach (AdminEditStaticsRoom adminRoom in AdminEditingRooms.Values)
@@ -992,7 +997,7 @@ namespace Oxide.Plugins
                 CleanupEntities();
                 if (!HasMinimumRequiredPlayers())
                 {
-                    Broadcast("Notification.NotEnoughToStart");
+                    BroadcastToRoom(Message("Notification.NotEnoughToStart"));
                     return;
                 }
                 InvokeHandler.CancelInvoke(this, BroadcastOpenEvent);
@@ -1016,7 +1021,7 @@ namespace Oxide.Plugins
                 InvokeHandler.CancelInvoke(this, PrestartEvent);
                 if (!HasMinimumRequiredPlayers())
                 {
-                    Broadcast("Notification.NotEnoughToStart");
+                    BroadcastToRoom(Message("Notification.NotEnoughToStart"));
                     EndEvent();
                     return;
                 }
@@ -1202,7 +1207,7 @@ namespace Oxide.Plugins
                     spectators.Remove(player);
 
                     if (Configuration.Message.BroadcastLeavers)
-                        Broadcast("Notification.PlayerLeft", player.displayName, Config.EventName);
+                        BroadcastToRoom(String.Format(Message("Notification.PlayerLeft"), player.displayName, Config.EventName));
 
                     if (!string.IsNullOrEmpty(Config.ZoneID))
                         Instance.ZoneManager?.Call("RemovePlayerFromZoneWhitelist", Config.ZoneID, player);
@@ -1266,7 +1271,7 @@ namespace Oxide.Plugins
                     spectators.Remove(player);
 
                     if (Configuration.Message.BroadcastLeavers)
-                        Broadcast("Notification.PlayerLeft", player.displayName, Config.EventName);
+                        BroadcastToRoom(String.Format(Message("Notification.PlayerLeft"), player.displayName, Config.EventName));
 
                     if (!string.IsNullOrEmpty(Config.ZoneID))
                         Instance.ZoneManager?.Call("RemovePlayerFromZoneWhitelist", Config.ZoneID, player);
@@ -1730,13 +1735,13 @@ namespace Oxide.Plugins
                     if (Plugin.IsTeamEvent)
                     {
                         Team team = winners[0].Team;
-                        Broadcast("Notification.EventWin.Multiple.Team", team == Team.B ? TeamBColor : TeamAColor, team, winners.Select(x => x.Player.displayName).ToSentence());
+                        BroadcastToRoom(string.Format(Message("Notification.EventWin.Multiple.Team"),team == Team.B ? TeamBColor : TeamAColor, team, winners.Select(x => x.Player.displayName).ToSentence()));
                     }
                     else
                     {
                         if (winners.Count > 1)
-                            Broadcast("Notification.EventWin.Multiple", winners.Select(x => x.Player.displayName).ToSentence());
-                        else Broadcast("Notification.EventWin", winners[0].Player.displayName);
+                            BroadcastToRoom(string.Format(Message("Notification.EventWin.Multiple"),winners.Select(x => x.Player.displayName).ToSentence()));
+                        else BroadcastToRoom(string.Format(Message("Notification.EventWin"), winners[0].Player.displayName));
                     }
                 }
 
