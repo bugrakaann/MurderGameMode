@@ -146,10 +146,10 @@ namespace Oxide.Plugins
             }
         }
         
-        [HarmonyPatch(typeof(AntiHack), nameof(AntiHack.TestNoClipping))]
+        [HarmonyPatch(typeof(AntiHack), nameof(AntiHack.IsNoClipping))]
         class Patch07
         {
-            static bool Prefix(ref bool __result,BasePlayer ply, Vector3 oldPos, Vector3 newPos, float radius, float backtracking, bool sphereCast, bool vehicleLayer = false, BaseEntity ignoreEntity = null)
+            static bool Prefix(ref bool __result,BasePlayer ply, TickInterpolator ticks, float deltaTime)
             {
                 if (ply.HasComponent<EventManager.BaseEventPlayer>())
                 {
