@@ -608,6 +608,7 @@ namespace Oxide.Plugins
 
             UI.Label(container, roomlabel, $"{GetConvertedRoomStatus(game.Status)}", 24, UI.TransformToUI4(288f, 468f, 39f, 81f, 672f, 92f));
             UI.Label(container, roomlabel, $"{game.eventPlayers?.Count}/{game.gameroom.maxPlayer}", 15, UI.TransformToUI4(356f, 406f, 13f, 38f, 672f, 92f));
+            UI.Label(container, roomlabel, $"({game.spectators?.Count})", 8, UI.TransformToUI4(416f, 496f, 13f, 38f, 672f, 92f),TextAnchor.MiddleLeft);
 
             UI.Button(container, roomlabel, UI.Color("#7c0000", 1f), "    JOIN", 20, UI.TransformToUI4(529f, 672f, 0f, 91f, 672f, 92f), $"lobbysystem.join {game.gameroom.roomID}", TextAnchor.MiddleCenter, "RobotoCondensed-Regular.ttf");
             UI.Image(container, roomlabel, GetImage("joinbutton"), UI.TransformToUI4(542f, 573f, 31f, 62f, 672f, 92f));
