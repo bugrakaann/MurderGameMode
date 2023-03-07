@@ -2185,8 +2185,16 @@ namespace Oxide.Plugins
             private void BroadcastOpenEvent()
             {
                 int timeRemaining = (int)(_startsAtTime - Time.time);
+                string owner;
+                if (!gameroom.isCreatedbySystem)
+                {
+                    BasePlayer player = BasePlayer.FindByID(gameroom.ownerID);
+                    owner = player.displayName;
+                }
+                else
+                    owner = "System";
                 if (timeRemaining > 0)
-                    Broadcast("Notification.EventOpen", Config.EventName, Config.EventType, timeRemaining);
+                    Broadcast("Notification.EventOpen",owner, Config.EventName);
             }
             #endregion
 
@@ -2275,6 +2283,7 @@ namespace Oxide.Plugins
                 Player.metabolism.radiation_poison.value = 0;
 
                 Player.metabolism.SendChangesToClient();
+                Player.StopWounded();
             }
 
             void OnDestroy()
@@ -2760,6 +2769,7 @@ namespace Oxide.Plugins
                 
                 entity.skinID = skinID;
                 entity.Spawn();
+                entity.SendNetworkUpdate();
                 staticEntity = entity;
                 return entity;
             }
@@ -4475,28 +4485,28 @@ namespace Oxide.Plugins
         private readonly Dictionary<string, string> Messages = new Dictionary<string, string>
         {
             ["Notification.NotEnoughToContinue"] = "There are not enough players to continue the event...",
-            ["Notification.NotEnoughToStart"] = "There is not enough players to start the event...",
-            ["Notification.EventOpen"] = "The event <color=#007acc>{0}</color> (<color=#007acc>{1}</color>) is open for players\nIt will start in <color=#007acc>{2} seconds</color>\nType <color=#007acc>/event</color> to join",
+            ["Notification.NotEnoughToStart"] = "There is not enough players to start the game...",
+            ["Notification.EventOpen"] = "New room opened by <color=#5D82CB>{0}</color>. \nArena: <color=#5D82CB>{1}</color>\nIt will start soon",
             ["Notification.EventClosed"] = "The event has been closed to new players",
             ["Notification.EventFinished"] = "The event has finished",
             ["Notification.MaximumPlayers"] = "The event is already at maximum capacity",
-            ["Notification.PlayerJoined"] = "<color=#007acc>{0}</color> has joined the <color=#007acc>{1}</color> event!",
+            ["Notification.PlayerJoined"] = "<color=#5D82CB>{0}</color> has joined the <color=#5D82CB>{1}</color> event!",
             ["Notification.AlreadyInRoom"] = "You are already in room",
             ["Notification.Cantjointworoom"] = "You can't join more than one room at the same time",
-            ["Notification.PlayerLeft"] = "<color=#007acc>{0}</color> has left the <color=#007acc>{1}</color> event!",
+            ["Notification.PlayerLeft"] = "<color=#5D82CB>{0}</color> has left the <color=#5D82CB>{1}</color> event!",
             ["Notification.RoundStartsIn"] = "Round starts in",
-            ["Notification.EventWin"] = "<color=#007acc>{0}</color> won the event!",
+            ["Notification.EventWin"] = "<color=#5D82CB>{0}</color> won the event!",
             ["Notification.EventWin.Multiple"] = "The following players won the event; <color=#007acc>{0}</color>",
-            ["Notification.EventWin.Multiple.Team"] = "<color={0}>Team {1}</color> won the event (<color=#007acc>{2}</color>)",
+            ["Notification.EventWin.Multiple.Team"] = "<color={0}>Team {1}</color> won the event (<color=#5D82CB>{2}</color>)",
             ["Notification.Teams.Unbalanced"] = "The teams are unbalanced. Shuffling players...",
-            ["Notification.Teams.TeamChanged"] = "You were moved to team <color=#007acc>{0}</color>",
+            ["Notification.Teams.TeamChanged"] = "You were moved to team <color=#5D82CB>{0}</color>",
             ["Notification.OutOfBounds"] = "You are out of the playable area. <color=#007acc>Return immediately</color> or you will be killed!",
             ["Notification.OutOfBounds.Time"] = "You have <color=#007acc>{0} seconds</color> to return...",
-            ["Notification.Death.Suicide"] = "<color=#007acc>{0}</color> killed themselves...",
-            ["Notification.Death.OOB"] = "<color=#007acc>{0}</color> tried to run away...",
-            ["Notification.Death.Killed"] = "<color=#007acc>{0}</color> was killed by <color=#007acc>{1}</color>",
-            ["Notification.Suvival.Remain"] = "(<color=#007acc>{0}</color> players remain)",
-            ["Notification.SpectateCycle"] = "Press <color=#007acc>JUMP</color> to cycle spectate targets",
+            ["Notification.Death.Suicide"] = "<color=#5D82CB>{0}</color> killed themselves...",
+            ["Notification.Death.OOB"] = "<color=#5D82CB>{0}</color> tried to run away...",
+            ["Notification.Death.Killed"] = "<color=#5D82CB>{0}</color> was killed by <color=#5D82CB>{1}</color>",
+            ["Notification.Suvival.Remain"] = "(<color=#5D82CB>{0}</color> players remain)",
+            ["Notification.SpectateCycle"] = "Press <color=#5D82CB>JUMP</color> to cycle spectate targets",
             ["Notification.NoRoomOwner"] = "Room owner left the game. Room is closing.",
             ["Info.Event.Current"] = "Current Event: {0} ({1})",
             ["Info.Event.Players"] = "\n{0} / {1} Players",
