@@ -106,7 +106,7 @@ namespace Oxide.Plugins
             else if (ValidateSpawnFile(Configuration.lobbyspawnfilename) != null)
                 PrintError("Lobby spawnfile name is corrupted");
             
-            //NextFrame(() => DeleteEntitiesInArenas());
+            NextFrame(() => DeleteEntitiesInArenas());
         }
         private void Unload()
         {
@@ -526,9 +526,9 @@ namespace Oxide.Plugins
             if (owner == null)
                 return;
             
-            BaseEventPlayer baseeventplayer;
-            if (owner.TryGetComponent(out baseeventplayer))
-                baseeventplayer.Event.AddItemToRoom(entity);
+            CurrentEventInfo eventInfo;
+            if (owner.TryGetComponent(out eventInfo))
+                eventInfo.eventgame.AddItemToRoom(entity);
         }
         object CanLootEntity(BasePlayer player, LootableCorpse  corpse)
         {
@@ -765,7 +765,8 @@ namespace Oxide.Plugins
                     return;
                 foreach (BaseEntity entity in entities)
                 {
-                    entity.Kill();
+                    if(!entity.IsDestroyed)
+                        entity.Kill();
                 }
             }
         }
@@ -882,7 +883,7 @@ namespace Oxide.Plugins
                 CleanupEntities();
                 CleanupStaticEntities();
 
-                foreach (BaseEventPlayer eventPlayer in eventPlayers)
+                foreach (BaseEventPlayer eventPlayer in eventPlayers.ToList())
                 {
                     if (eventPlayer.IsDead)
                         ResetPlayer(eventPlayer);
@@ -890,7 +891,7 @@ namespace Oxide.Plugins
                     LeaveEvent(eventPlayer);
                 }
                 
-                foreach (BasePlayer player in spectators)
+                foreach (BasePlayer player in spectators.ToList())
                 {
                     ResetPlayer(player);
                     LeaveEvent(player);
@@ -962,6 +963,8 @@ namespace Oxide.Plugins
                 _isClosed = false;
                 Status = EventManager.EventStatus.Open;
                 Instance.LobbyRoomSystem.Call("RefreshLobbyUI");
+                if(!isstaticsSpawned)
+                    SpawnStaticPrefabs();
 
                 if (Configuration.Message.Announce)
                 {
@@ -994,6 +997,10 @@ namespace Oxide.Plugins
                     if (player.HasComponent<BaseEventPlayer>())
                         DestroyImmediate(player.GetComponent<BaseEventPlayer>());
                 }
+                eventPlayers.ForEach(player => spectators.Add(player.Player));
+                Pool.FreeList(ref eventPlayers);
+                eventPlayers = Pool.GetList<BaseEventPlayer>();
+                
                 CleanupEntities();
                 if (!HasMinimumRequiredPlayers())
                 {
@@ -1004,12 +1011,17 @@ namespace Oxide.Plugins
 
                 Status = EventManager.EventStatus.Prestarting;
 
-                if(!isstaticsSpawned)
+                //If staticobjects are missing respawn all of them
+                if (staticobjects.Count != StaticObjects[Config.EventName].Count)
+                {
+                    staticobjects.ForEach(entity =>
+                    {
+                        if(!entity.IsDestroyed)
+                            entity.Kill();
+                    });
                     SpawnStaticPrefabs();
+                }
                 
-                eventPlayers.ForEach(player => spectators.Add(player.Player));
-                Pool.FreeList(ref eventPlayers);
-                eventPlayers = Pool.GetList<BaseEventPlayer>();
                 StartCoroutine(CreateEventPlayers());
             }
 
@@ -1182,6 +1194,9 @@ namespace Oxide.Plugins
                 else if(Status == EventManager.EventStatus.Prestarting || Status == EventManager.EventStatus.Open)
                 {
                     spectators.Add(player);
+                    bool isInZone = (bool)Instance.ZoneManager.CallHook("isPlayerInZone", Config.ZoneID, player);
+                    if(!isInZone)
+                        SpawnPlayer(player);
                 }
                 else
                 {
@@ -1453,7 +1468,7 @@ namespace Oxide.Plugins
             /// <param name="eventPlayer"></param>
             /// <param name="giveKit">Should this player recieve a kit?</param>
             /// <param name="sleep">Should this player be put to sleep before teleporting?</param>
-            internal void SpawnPlayer(BaseEventPlayer eventPlayer, bool giveKit = true, bool sleep = false)
+            internal virtual void SpawnPlayer(BaseEventPlayer eventPlayer, bool giveKit = true, bool sleep = false)
             {
                 BasePlayer player = eventPlayer?.Player;
                 if (player == null)
