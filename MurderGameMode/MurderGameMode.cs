@@ -486,6 +486,8 @@ namespace Oxide.Plugins
                     BroadcastToRoom(string.Format(Instance.Message("NeededPlayer"),GetNeededRequiredPlayers()));
                 }
                 SendRoomHelper(player, gameroom);
+                EventManager.StripInventory(player);
+                GivePrestartingCostume(player);
                 base.OnPlayerJoined(player);
             }
 
@@ -531,6 +533,49 @@ namespace Oxide.Plugins
                 }
                 base.LeaveEvent(eventPlayer);
             }
+
+            internal override void SpawnPlayer(EventManager.BaseEventPlayer eventPlayer, bool giveKit = true, bool sleep = false)
+            {
+                BasePlayer player = eventPlayer?.Player;
+                if (player == null)
+                    return;
+
+                eventPlayer.Player.GetMounted()?.AttemptDismount(eventPlayer.Player);
+
+                if (eventPlayer.Player.HasParent())
+                    eventPlayer.Player.SetParent(null, true);
+
+                EventManager.StripInventory(player);
+
+                EventManager.ResetMetabolism(player);
+
+                EventManager.MovePosition(player, eventPlayer.Team == EventManager.Team.B ? _spawnSelectorB.GetSpawnPoint() : _spawnSelectorA.GetSpawnPoint(), sleep);
+
+
+                UpdateScoreboard(eventPlayer);
+
+                if (giveKit)
+                {
+                    Instance.NextTick(() =>
+                    {
+                        if (!CanGiveKit(eventPlayer))
+                            return;
+
+                        EventManager.GiveKit(player, eventPlayer.Kit);
+
+                        OnKitGiven(eventPlayer);
+                    });
+                }
+                else
+                {
+                    GivePrestartingCostume(eventPlayer.Player);
+                }
+
+                eventPlayer.ApplyInvincibility();
+
+                OnPlayerSpawned(eventPlayer);
+            }
+
             protected override bool CanDropBackpack() { return false;}
             //Disguising kılık değiştirme
             internal override object CanLootEntity(BasePlayer player, LootableCorpse corpse)
@@ -757,11 +802,6 @@ namespace Oxide.Plugins
 
                 //Give game costumes or prestarting costumes
                 SpawnPlayer(eventPlayer, Status == EventManager.EventStatus.Started, false);
-                if (Status == EventManager.EventStatus.Prestarting)
-                {
-                    int index = random.Next(1,4);
-                    EventManager.GiveKit(player,$"prestartingcostume{index}");
-                }
 
                 if (!string.IsNullOrEmpty(Config.ZoneID))
                     EventManager.Instance.ZoneManager?.Call("AddPlayerToZoneWhitelist", Config.ZoneID, player);
@@ -956,6 +996,14 @@ namespace Oxide.Plugins
                 });
             }
 
+            private void GivePrestartingCostume(BasePlayer player)
+            {
+                if (!player.IsSpectating())
+                {
+                    int index = random.Next(1,4);
+                    EventManager.GiveKit(player,$"prestartingcostume{index}");
+                }
+            }
             MurderPlayer GetMurderer()
             {
                 foreach(MurderPlayer eventPlayer in EventManager.GetEventPlayersOfRoom(this))
