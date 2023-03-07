@@ -151,7 +151,7 @@ namespace Oxide.Plugins
         {
             static bool Prefix(ref bool __result,BasePlayer ply, TickInterpolator ticks, float deltaTime)
             {
-                if (ply.HasComponent<EventManager.BaseEventPlayer>())
+                if (ply.HasComponent<EventManager.NetworkGroupData>())
                 {
                     __result = false;
                     return false;
