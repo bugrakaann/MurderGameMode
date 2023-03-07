@@ -25,7 +25,7 @@ namespace Oxide.Plugins
         const string skinpanel_UI = "murderskinmanager.skinpanelui";
 
         #region Fields
-        static Dictionary<BasePlayer, SkinPreferences> skinPreferences = new Dictionary<BasePlayer, SkinPreferences>();
+        static Dictionary<ulong, SkinPreferences> skinPreferences = new Dictionary<ulong, SkinPreferences>();
         #endregion
 
         #region Config
@@ -103,6 +103,12 @@ namespace Oxide.Plugins
             RegisterImages();
             permission.RegisterPermission(perm_skinmanager_use, this);
         }
+
+        private void OnPlayerDisconnected(BasePlayer player)
+        {
+            if (skinPreferences.ContainsKey(player.userID))
+                skinPreferences.Remove(player.userID);
+        }
         #endregion
 
         #region UI
@@ -152,26 +158,26 @@ namespace Oxide.Plugins
             PageCategory category = (PageCategory)arg.GetInt(1);
             int pagenum = arg.GetInt(2);
 
-            if (!skinPreferences.ContainsKey(arg.Player()))
-                skinPreferences.Add(player, new SkinPreferences());
+            if (!skinPreferences.ContainsKey(arg.Player().userID))
+                skinPreferences.Add(player.userID, new SkinPreferences());
 
             switch (category)
             {
                 case PageCategory.Costumes:
                     KeyValuePair<string,SkinInfo> costume = Configuration.costumes.ElementAt(itemno);
-                    skinPreferences[player].costume = costume.Key;
+                    skinPreferences[player.userID].costume = costume.Key;
                     break;
                 case PageCategory.RevolverSkins:
                     KeyValuePair<string, SkinInfo> revolverskin = Configuration.revolverskins.ElementAt(itemno);
-                    skinPreferences[player].revolverSkin.skinname = revolverskin.Key;
-                    skinPreferences[player].revolverSkin.skinID = revolverskin.Value.skinID;
-                    skinPreferences[player].revolverSkin.itemshortname = revolverskin.Value.shortname;
+                    skinPreferences[player.userID].revolverSkin.skinname = revolverskin.Key;
+                    skinPreferences[player.userID].revolverSkin.skinID = revolverskin.Value.skinID;
+                    skinPreferences[player.userID].revolverSkin.itemshortname = revolverskin.Value.shortname;
                     break;
                 case PageCategory.MeleeSkins:
                     KeyValuePair<string, SkinInfo> meleeskin = Configuration.meleeskins.ElementAt(itemno);
-                    skinPreferences[player].meleeSkin.skinname = meleeskin.Key;
-                    skinPreferences[player].meleeSkin.skinID =meleeskin.Value.skinID;
-                    skinPreferences[player].meleeSkin.itemshortname =meleeskin.Value.shortname;
+                    skinPreferences[player.userID].meleeSkin.skinname = meleeskin.Key;
+                    skinPreferences[player.userID].meleeSkin.skinID =meleeskin.Value.skinID;
+                    skinPreferences[player.userID].meleeSkin.itemshortname =meleeskin.Value.shortname;
                     break;
             }
             SendSkinPanel(player, category, pagenum);
@@ -248,7 +254,7 @@ namespace Oxide.Plugins
                     return;
                 UI.Image(container, skinpanellabel_UI, parent, GetImage("itemcontainer.sm"), UI.TransformToUI4(57f + xoffset, 267f + xoffset, 334f - yoffset, 542f - yoffset, 1300f, 720f));
                 UI.Image(container, skinpanellabel_UI, GetImage(skin.Value.thumbnailname), UI.TransformToUI4(19f, 190f, 33f, 205f, 210f, 205f));
-                if (!skinPreferences.ContainsKey(player) || skinPreferences[player]?.costume != skin.Key)
+                if (!skinPreferences.ContainsKey(player.userID) || skinPreferences[player.userID]?.costume != skin.Key)
                 {
                     UI.Image(container,skinpanellabel_UI, GetImage("labelequip.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     if (permission.UserHasPermission(player.UserIDString, perm_skinmanager_use))
@@ -261,7 +267,7 @@ namespace Oxide.Plugins
                         UI.Label(container, skinpanellabel_UI, "Buy <color=#fed559>V</color><color=#fcacb2>I</color><color=#fd70da>P</color>", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     }
                 }
-                else if(skinPreferences[player].costume == skin.Key)
+                else if(skinPreferences[player.userID].costume == skin.Key)
                 {
                     UI.Image(container, skinpanellabel_UI, GetImage("labelequipped.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     UI.Label(container, skinpanellabel_UI, "Equipped", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
@@ -274,7 +280,7 @@ namespace Oxide.Plugins
                     return;
                 UI.Image(container, skinpanellabel_UI, parent, GetImage("itemcontainer.sm"), UI.TransformToUI4(57f + xoffset, 267f + xoffset, 334f - yoffset, 542f - yoffset, 1300f, 720f));
                 UI.Image(container, skinpanellabel_UI, GetImage(skin.Value.thumbnailname), UI.TransformToUI4(19f, 190f, 33f, 205f, 210f, 205f));
-                if (!skinPreferences.ContainsKey(player) || skinPreferences[player]?.revolverSkin?.skinname != skin.Key)
+                if (!skinPreferences.ContainsKey(player.userID) || skinPreferences[player.userID]?.revolverSkin?.skinname != skin.Key)
                 {
                     UI.Image(container, skinpanellabel_UI, GetImage("labelequip.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     if (permission.UserHasPermission(player.UserIDString, perm_skinmanager_use))
@@ -287,7 +293,7 @@ namespace Oxide.Plugins
                         UI.Label(container, skinpanellabel_UI, "Buy <color=#fed559>V</color><color=#fcacb2>I</color><color=#fd70da>P</color>", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     }
                 }
-                else if (skinPreferences[player].revolverSkin.skinname == skin.Key)
+                else if (skinPreferences[player.userID].revolverSkin.skinname == skin.Key)
                 {
                     UI.Image(container, skinpanellabel_UI, GetImage("labelequipped.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     UI.Label(container, skinpanellabel_UI, "Equipped", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
@@ -301,7 +307,7 @@ namespace Oxide.Plugins
                     return;
                 UI.Image(container, skinpanellabel_UI, parent, GetImage("itemcontainer.sm"), UI.TransformToUI4(57f + xoffset, 267f + xoffset, 334f - yoffset, 542f - yoffset, 1300f, 720f));
                 UI.Image(container, skinpanellabel_UI, GetImage(skin.Value.thumbnailname), UI.TransformToUI4(19f, 190f, 33f, 205f, 210f, 205f));
-                if (!skinPreferences.ContainsKey(player) || skinPreferences[player]?.meleeSkin?.skinname != skin.Key)
+                if (!skinPreferences.ContainsKey(player.userID) || skinPreferences[player.userID]?.meleeSkin?.skinname != skin.Key)
                 {
                     UI.Image(container, skinpanellabel_UI, GetImage("labelequip.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     if (permission.UserHasPermission(player.UserIDString, perm_skinmanager_use))
@@ -314,7 +320,7 @@ namespace Oxide.Plugins
                         UI.Label(container, skinpanellabel_UI, "Buy <color=#fed559>V</color><color=#fcacb2>I</color><color=#fd70da>P</color>", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     }
                 }
-                else if (skinPreferences[player].meleeSkin.skinname == skin.Key)
+                else if (skinPreferences[player.userID].meleeSkin.skinname == skin.Key)
                 {
                     UI.Image(container, skinpanellabel_UI, GetImage("labelequipped.sm"), UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
                     UI.Label(container, skinpanellabel_UI, "Equipped", 12, UI.TransformToUI4(0f, 209f, 0f, 31f, 210f, 205f));
@@ -388,8 +394,8 @@ namespace Oxide.Plugins
         #region API
         public static SkinPreferences GetPreferencesOfPlayer(BasePlayer player)
         {
-            if(skinPreferences.ContainsKey(player))
-                return skinPreferences[player];
+            if(skinPreferences.ContainsKey(player.userID))
+                return skinPreferences[player.userID];
             return new SkinPreferences();
         }
         #endregion
